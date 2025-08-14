@@ -139,6 +139,25 @@ export const mockDatabase = {
       notaQuestionario: 8,
       tempoAssistido: 2400
     }
+  ],
+  // --- NOVA SEÇÃO ADICIONADA ---
+  trilhas: [
+    {
+      id: 1,
+      titulo: "Integração Novos Colaboradores",
+      descricao: "Trilha essencial para todos os novos funcionários da empresa.",
+      departamento: "Todos",
+      ativo: true,
+      treinamentos: [1, 2] // IDs dos treinamentos em ordem
+    },
+    {
+      id: 2,
+      titulo: "Especialista Fiscal",
+      descricao: "Aprofunde seus conhecimentos na área fiscal.",
+      departamento: "Fiscal",
+      ativo: true,
+      treinamentos: [3]
+    }
   ]
 };
 
@@ -168,6 +187,9 @@ export const initializeDatabase = () => {
   const existingData = getFromStorage('trainingDatabase');
   if (!existingData) {
     saveToStorage('trainingDatabase', mockDatabase);
+  } else if (!existingData.trilhas) { // Adiciona a seção de trilhas se não existir
+    existingData.trilhas = mockDatabase.trilhas;
+    saveToStorage('trainingDatabase', existingData);
   }
   return getFromStorage('trainingDatabase');
 };

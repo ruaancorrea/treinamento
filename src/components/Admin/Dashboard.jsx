@@ -5,7 +5,6 @@ import {
   BookOpen, 
   TrendingUp, 
   Award,
-  Clock,
   CheckCircle,
   AlertCircle,
   BarChart3
@@ -13,7 +12,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDatabase } from '@/data/mockData';
 
-const Dashboard = () => {
+// 1. Receba a prop { setActiveTab } aqui
+const Dashboard = ({ setActiveTab }) => { 
   const [stats, setStats] = useState({
     totalUsuarios: 0,
     usuariosAtivos: 0,
@@ -29,7 +29,7 @@ const Dashboard = () => {
   useEffect(() => {
     const database = getDatabase();
     
-    // Calculate statistics
+    // Calcula as estatísticas (lógica inalterada)
     const totalUsuarios = database.usuarios.length;
     const usuariosAtivos = database.usuarios.filter(u => u.ativo).length;
     const totalTreinamentos = database.treinamentos.filter(t => t.ativo).length;
@@ -38,7 +38,6 @@ const Dashboard = () => {
     const totalPossiveisConclusoes = database.usuarios.filter(u => u.tipo === 'funcionario').length * totalTreinamentos;
     const taxaConclusao = totalPossiveisConclusoes > 0 ? Math.round((totalConclusoes / totalPossiveisConclusoes) * 100) : 0;
     
-    // Check for expiring trainings (within 30 days)
     const today = new Date();
     const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
     const treinamentosVencendo = database.treinamentos.filter(t => {
@@ -57,7 +56,7 @@ const Dashboard = () => {
       treinamentosVencendo
     });
 
-    // Get recent activity
+    // Obtém a atividade recente (lógica inalterada)
     const recent = database.historico
       .filter(h => h.concluido)
       .sort((a, b) => new Date(b.dataConclusao) - new Date(a.dataConclusao))
@@ -108,7 +107,6 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -118,7 +116,6 @@ const Dashboard = () => {
         <p className="text-slate-400">Visão geral da Central de Treinamento</p>
       </motion.div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
@@ -148,7 +145,6 @@ const Dashboard = () => {
         })}
       </div>
 
-      {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -205,7 +201,6 @@ const Dashboard = () => {
           </Card>
         </motion.div>
 
-        {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -226,10 +221,8 @@ const Dashboard = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full p-3 text-left rounded-lg bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 hover:border-blue-400 transition-colors"
-                onClick={() => {
-                  // This would navigate to users section
-                  console.log('Navigate to users');
-                }}
+                // 2. Use a prop para mudar de aba
+                onClick={() => setActiveTab('usuarios')}
               >
                 <div className="flex items-center space-x-3">
                   <Users className="w-5 h-5 text-blue-400" />
@@ -244,10 +237,8 @@ const Dashboard = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full p-3 text-left rounded-lg bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 hover:border-green-400 transition-colors"
-                onClick={() => {
-                  // This would navigate to trainings section
-                  console.log('Navigate to trainings');
-                }}
+                // 3. Use a prop para mudar de aba
+                onClick={() => setActiveTab('treinamentos')}
               >
                 <div className="flex items-center space-x-3">
                   <BookOpen className="w-5 h-5 text-green-400" />
@@ -262,10 +253,8 @@ const Dashboard = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full p-3 text-left rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-400 transition-colors"
-                onClick={() => {
-                  // This would navigate to reports section
-                  console.log('Navigate to reports');
-                }}
+                // 4. Use a prop para mudar de aba
+                onClick={() => setActiveTab('relatorios')}
               >
                 <div className="flex items-center space-x-3">
                   <BarChart3 className="w-5 h-5 text-purple-400" />

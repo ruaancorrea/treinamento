@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Edit, Trash2, BookOpen, Check, X, Tag, Users, Calendar, Clock, AlertTriangle, FileText, HelpCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, BookOpen, Tag, Users, Clock, FileText, HelpCircle, Upload, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { getDatabase, updateDatabase } from '@/data/mockData';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; // Importe o RadioGroup
 
 const TrainingManagement = () => {
   const [trainings, setTrainings] = useState([]);
@@ -21,7 +22,10 @@ const TrainingManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTraining, setEditingTraining] = useState(null);
-  const [formData, setFormData] = useState({
+  
+  const fileInputRef = useRef(null); // Ref para o input de arquivo
+  
+  const initialFormData = {
     titulo: '',
     descricao: '',
     video: '',
@@ -31,8 +35,10 @@ const TrainingManagement = () => {
     ativo: true,
     dataExpiracao: '',
     perguntas: [],
-    arquivosComplementares: ''
-  });
+    arquivosComplementares: [] // Alterado para array
+  };
+  
+  const [formData, setFormData] = useState(initialFormData);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,18 +65,7 @@ const TrainingManagement = () => {
   };
 
   const resetForm = () => {
-    setFormData({
-      titulo: '',
-      descricao: '',
-      video: '',
-      categoriaId: '',
-      departamento: 'Todos',
-      obrigatorio: false,
-      ativo: true,
-      dataExpiracao: '',
-      perguntas: [],
-      arquivosComplementares: ''
-    });
+    setFormData(initialFormData);
     setEditingTraining(null);
   };
 
@@ -79,7 +74,9 @@ const TrainingManagement = () => {
     setFormData({
       ...training,
       categoriaId: training.categoriaId.toString(),
-      arquivosComplementares: (training.arquivosComplementares || []).join(', '),
+      // Garante que os campos sejam arrays vazios se não existirem
+      arquivosComplementares: training.arquivosComplementares || [],
+      perguntas: training.perguntas || [],
       dataExpiracao: training.dataExpiracao || ''
     });
     setIsDialogOpen(true);
@@ -87,13 +84,21 @@ const TrainingManagement = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const database = getDatabase();
+    // Validação para garantir que cada pergunta tem uma resposta correta
+    if (formData.perguntas.some(q => q.respostaCorreta === undefined || q.respostaCorreta === null)) {
+        toast({
+            title: "Erro de Validação",
+            description: "Todas as perguntas devem ter uma resposta correta selecionada.",
+            variant: "destructive",
+        });
+        return;
+    }
 
+    const database = getDatabase();
     const preparedData = {
       ...formData,
       categoriaId: parseInt(formData.categoriaId),
       dataExpiracao: formData.dataExpiracao || null,
-      arquivosComplementares: formData.arquivosComplementares.split(',').map(s => s.trim()).filter(Boolean)
     };
 
     if (editingTraining) {
@@ -116,16 +121,58 @@ const TrainingManagement = () => {
     resetForm();
     setIsDialogOpen(false);
   };
-
-  const handleDelete = (trainingId) => {
-    if (window.confirm("Tem certeza que deseja remover este treinamento?")) {
-      const database = getDatabase();
-      const updatedTrainings = database.treinamentos.filter(t => t.id !== trainingId);
-      updateDatabase({ ...database, treinamentos: updatedTrainings });
-      loadData();
-      toast({ title: "Treinamento removido com sucesso." });
-    }
+  
+  // --- NOVAS FUNÇÕES PARA GERENCIAR PERGUNTAS ---
+  const handleAddQuestion = () => {
+    setFormData(prev => ({
+      ...prev,
+      perguntas: [...prev.perguntas, { pergunta: '', opcoes: ['', '', '', ''], respostaCorreta: null }]
+    }));
   };
+
+  const handleRemoveQuestion = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      perguntas: prev.perguntas.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleQuestionChange = (index, value) => {
+    const newQuestions = [...formData.perguntas];
+    newQuestions[index].pergunta = value;
+    setFormData({ ...formData, perguntas: newQuestions });
+  };
+  
+  const handleOptionChange = (qIndex, oIndex, value) => {
+    const newQuestions = [...formData.perguntas];
+    newQuestions[qIndex].opcoes[oIndex] = value;
+    setFormData({ ...formData, perguntas: newQuestions });
+  };
+  
+  const handleCorrectAnswerChange = (qIndex, oIndex) => {
+    const newQuestions = [...formData.perguntas];
+    newQuestions[qIndex].respostaCorreta = oIndex;
+    setFormData({ ...formData, perguntas: newQuestions });
+  };
+
+  // --- NOVAS FUNÇÕES PARA UPLOAD DE ARQUIVOS ---
+  const handleFileSelect = (event) => {
+      const files = Array.from(event.target.files);
+      // Aqui estamos apenas armazenando os nomes. Numa app real, você faria o upload.
+      const fileNames = files.map(file => file.name);
+      setFormData(prev => ({
+          ...prev,
+          arquivosComplementares: [...prev.arquivosComplementares, ...fileNames]
+      }));
+  };
+
+  const handleRemoveFile = (fileName) => {
+      setFormData(prev => ({
+          ...prev,
+          arquivosComplementares: prev.arquivosComplementares.filter(f => f !== fileName)
+      }));
+  };
+
 
   return (
     <div className="space-y-6">
@@ -140,12 +187,14 @@ const TrainingManagement = () => {
               <Plus className="w-4 h-4 mr-2" /> Novo Treinamento
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass-effect border-slate-700 text-white max-w-2xl">
+          <DialogContent className="glass-effect border-slate-700 text-white max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>{editingTraining ? 'Editar' : 'Novo'} Treinamento</DialogTitle>
+              <DialogDescription>Preencha os detalhes do treinamento e adicione o conteúdo.</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto scrollbar-thin pr-4">
+              {/* --- Campos Principais --- */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="titulo">Título</Label>
                   <Input id="titulo" value={formData.titulo} onChange={e => setFormData({...formData, titulo: e.target.value})} className="bg-slate-800/50" required />
@@ -154,16 +203,10 @@ const TrainingManagement = () => {
                   <Label htmlFor="video">URL do Vídeo (Embed)</Label>
                   <Input id="video" value={formData.video} onChange={e => setFormData({...formData, video: e.target.value})} className="bg-slate-800/50" required />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="descricao">Descrição</Label>
-                <Textarea id="descricao" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="bg-slate-800/50" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="categoriaId">Categoria</Label>
                   <Select value={formData.categoriaId} onValueChange={value => setFormData({...formData, categoriaId: value})}>
-                    <SelectTrigger className="bg-slate-800/50"><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
+                    <SelectTrigger className="bg-slate-800/50"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>{categories.map(cat => <SelectItem key={cat.id} value={cat.id.toString()}>{cat.nome}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -176,28 +219,69 @@ const TrainingManagement = () => {
                 </div>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="descricao">Descrição</Label>
+                <Textarea id="descricao" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="bg-slate-800/50" />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="dataExpiracao">Data de Expiração (Opcional)</Label>
                 <Input type="date" id="dataExpiracao" value={formData.dataExpiracao} onChange={e => setFormData({...formData, dataExpiracao: e.target.value})} className="bg-slate-800/50" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="arquivos">Arquivos Complementares (separados por vírgula)</Label>
-                <Input id="arquivos" value={formData.arquivosComplementares} onChange={e => setFormData({...formData, arquivosComplementares: e.target.value})} className="bg-slate-800/50" />
-              </div>
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Switch id="obrigatorio" checked={formData.obrigatorio} onCheckedChange={checked => setFormData({...formData, obrigatorio: checked})} />
-                  <Label htmlFor="obrigatorio">Obrigatório</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="ativo" checked={formData.ativo} onCheckedChange={checked => setFormData({...formData, ativo: checked})} />
-                  <Label htmlFor="ativo">Ativo</Label>
-                </div>
+                  <div className="flex items-center space-x-2"><Switch id="obrigatorio" checked={formData.obrigatorio} onCheckedChange={checked => setFormData({...formData, obrigatorio: checked})} /><Label htmlFor="obrigatorio">Obrigatório</Label></div>
+                  <div className="flex items-center space-x-2"><Switch id="ativo" checked={formData.ativo} onCheckedChange={checked => setFormData({...formData, ativo: checked})} /><Label htmlFor="ativo">Ativo</Label></div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-slate-600">Cancelar</Button>
-                <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600">{editingTraining ? 'Salvar' : 'Criar'}</Button>
-              </DialogFooter>
+              
+              {/* --- SEÇÃO DE ARQUIVOS --- */}
+              <div className="space-y-3 pt-4 border-t border-slate-700">
+                  <h3 className="text-lg font-semibold text-white">Arquivos Complementares</h3>
+                  <Button type="button" variant="outline" onClick={() => fileInputRef.current.click()}>
+                      <Upload className="w-4 h-4 mr-2"/> Selecionar Arquivos
+                  </Button>
+                  <input type="file" multiple ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+                  <div className="space-y-2">
+                      {formData.arquivosComplementares.map(file => (
+                          <div key={file} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
+                              <span className="text-sm text-slate-300">{file}</span>
+                              <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleRemoveFile(file)}>
+                                  <XCircle className="w-4 h-4 text-red-500"/>
+                              </Button>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
+              {/* --- SEÇÃO DE PERGUNTAS --- */}
+              <div className="space-y-4 pt-4 border-t border-slate-700">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold text-white">Questionário</h3>
+                    <Button type="button" size="sm" onClick={handleAddQuestion}><Plus className="w-4 h-4 mr-2" /> Adicionar Pergunta</Button>
+                </div>
+                {formData.perguntas.map((q, qIndex) => (
+                  <div key={qIndex} className="p-4 border border-slate-700 rounded-lg space-y-4 bg-slate-800/30">
+                    <div className="flex justify-between items-center">
+                      <Label>Pergunta {qIndex + 1}</Label>
+                      <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveQuestion(qIndex)}><Trash2 className="w-4 h-4"/>
+                      </Button>
+                    </div>
+                    <Textarea placeholder="Digite a pergunta..." value={q.pergunta} onChange={(e) => handleQuestionChange(qIndex, e.target.value)} required/>
+                    
+                    <RadioGroup value={q.respostaCorreta?.toString()} onValueChange={(value) => handleCorrectAnswerChange(qIndex, parseInt(value))}>
+                        {q.opcoes.map((opt, oIndex) => (
+                          <div key={oIndex} className="flex items-center gap-2">
+                            <RadioGroupItem value={oIndex.toString()} id={`q${qIndex}o${oIndex}`} />
+                            <Input placeholder={`Opção ${oIndex + 1}`} value={opt} onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)} required />
+                          </div>
+                        ))}
+                    </RadioGroup>
+                  </div>
+                ))}
+              </div>
             </form>
+            <DialogFooter className="pt-4 border-t border-slate-700">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-slate-600">Cancelar</Button>
+              {/* O botão de submit agora está atrelado ao form via ID */}
+              <Button type="submit" form="trainingForm" className="bg-gradient-to-r from-blue-500 to-purple-600">{editingTraining ? 'Salvar' : 'Criar'}</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </motion.div>
@@ -209,6 +293,7 @@ const TrainingManagement = () => {
         </div>
       </motion.div>
 
+      {/* --- Grid de Treinamentos (Exibição) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTrainings.map((training, index) => (
           <motion.div key={training.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
@@ -225,7 +310,6 @@ const TrainingManagement = () => {
                 <p className="text-sm text-slate-300 line-clamp-3 flex-grow">{training.descricao}</p>
                 <div className="text-xs text-slate-400 space-y-1 pt-2 border-t border-slate-700">
                   <div className="flex items-center gap-2"><Users className="w-3 h-3"/><span>Departamento: {training.departamento}</span></div>
-                  {training.dataExpiracao && <div className="flex items-center gap-2"><Clock className="w-3 h-3"/><span>Expira em: {new Date(training.dataExpiracao).toLocaleDateString('pt-BR')}</span></div>}
                   <div className="flex items-center gap-2"><FileText className="w-3 h-3"/><span>Arquivos: {(training.arquivosComplementares || []).length}</span></div>
                   <div className="flex items-center gap-2"><HelpCircle className="w-3 h-3"/><span>Perguntas: {(training.perguntas || []).length}</span></div>
                 </div>
@@ -249,3 +333,4 @@ const TrainingManagement = () => {
 };
 
 export default TrainingManagement;
+

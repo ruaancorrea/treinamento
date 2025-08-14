@@ -8,9 +8,12 @@ import Dashboard from '@/components/Admin/Dashboard';
 import UserManagement from '@/components/Admin/UserManagement';
 import TrainingManagement from '@/components/Admin/TrainingManagement';
 import CategoryManagement from '@/components/Admin/CategoryManagement';
+import DepartmentManagement from '@/components/Admin/DepartmentManagement';
+import LearningPathManagement from '@/components/Admin/LearningPathManagement';
 import Reports from '@/components/Admin/Reports';
 import Settings from '@/components/Admin/Settings';
 import TrainingList from '@/components/Employee/TrainingList';
+import LearningPathList from '@/components/Employee/LearningPathList';
 import Progress from '@/components/Employee/Progress';
 import Ranking from '@/components/Employee/Ranking';
 import { initializeDatabase } from '@/data/mockData';
@@ -21,11 +24,7 @@ const MainApp = () => {
 
   useEffect(() => {
     if (user) {
-      if (isAdmin()) {
-        setActiveTab('dashboard');
-      } else {
-        setActiveTab('meus-treinamentos');
-      }
+      setActiveTab(isAdmin() ? 'dashboard' : 'meus-treinamentos');
     }
   }, [user, isAdmin]);
 
@@ -36,30 +35,36 @@ const MainApp = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      // Admin tabs
+      // Rotas do Administrador
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard setActiveTab={setActiveTab} />;
       case 'usuarios':
         return <UserManagement />;
       case 'treinamentos':
         return <TrainingManagement />;
+      case 'trilhas':
+        return <LearningPathManagement />;
       case 'categorias':
         return <CategoryManagement />;
+      case 'departamentos':
+        return <DepartmentManagement />;
       case 'relatorios':
         return <Reports />;
       case 'configuracoes':
         return <Settings />;
       
-      // Employee tabs
+      // Rotas do Funcionário
       case 'meus-treinamentos':
         return <TrainingList />;
+      case 'minhas-trilhas':
+        return <LearningPathList />;
       case 'progresso':
         return <Progress />;
       case 'ranking':
         return <Ranking />;
       
       default:
-        return isAdmin() ? <Dashboard /> : <TrainingList />;
+        return isAdmin() ? <Dashboard setActiveTab={setActiveTab} /> : <TrainingList />;
     }
   };
 
@@ -97,10 +102,10 @@ function App() {
   return (
     <AuthProvider>
       <Helmet>
-        <title>Central de Treinamento para Contabilidade</title>
+        <title>Central de Treinamento</title>
         <meta name="description" content="Plataforma completa de treinamento online para área contábil com controle de usuários, treinamentos e relatórios de progresso." />
-        <meta property="og:title" content="Central de Treinamento para Contabilidade" />
-        <meta property="og:description" content="Plataforma completa de treinamento online para área contábil com controle de usuários, treinamentos e relatórios de progresso." />
+        <meta property="og:title" content="Central de Treinamento" />
+        <meta property="og:description" content="Plataforma completa de treinamento online para área contábil." />
       </Helmet>
       <MainApp />
       <Toaster />
