@@ -1,12 +1,11 @@
-// --- Crie este novo arquivo: src/components/Admin/LearningPathManagement.jsx ---
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, ListOrdered, Check, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+// --- ESTA É A CORREÇÃO CRÍTICA ---
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -69,9 +68,9 @@ const LearningPathManagement = () => {
     } else {
       const newPath = {
         ...formData,
-        id: Math.max(0, ...db.trilhas.map(p => p.id)) + 1
+        id: Math.max(0, ...(db.trilhas || []).map(p => p.id)) + 1
       };
-      updateDatabase({ ...db, trilhas: [...db.trilhas, newPath] });
+      updateDatabase({ ...db, trilhas: [...(db.trilhas || []), newPath] });
       toast({ title: "Trilha criada com sucesso!" });
     }
     loadData();
@@ -164,7 +163,7 @@ const LearningPathManagement = () => {
                 <p className="text-sm text-slate-300 line-clamp-2">{path.descricao}</p>
                 <div className="text-xs text-slate-400 mt-4 pt-2 border-t border-slate-700 flex items-center gap-2">
                   <ListOrdered className="w-4 h-4" />
-                  <span>{path.treinamentos.length} Treinamento(s)</span>
+                  <span>{(path.treinamentos || []).length} Treinamento(s)</span>
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end space-x-2">

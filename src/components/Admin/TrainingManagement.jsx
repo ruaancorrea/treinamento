@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Edit, Trash2, BookOpen, Tag, Users, Clock, FileText, HelpCircle, Upload, XCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Upload, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { getDatabase, updateDatabase } from '@/data/mockData';
 import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; // Importe o RadioGroup
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const TrainingManagement = () => {
   const [trainings, setTrainings] = useState([]);
@@ -20,10 +20,12 @@ const TrainingManagement = () => {
   const [categories, setCategories] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [trainingToDelete, setTrainingToDelete] = useState(null);
   const [editingTraining, setEditingTraining] = useState(null);
   
-  const fileInputRef = useRef(null); // Ref para o input de arquivo
+  const fileInputRef = useRef(null);
   
   const initialFormData = {
     titulo: '',
@@ -35,7 +37,7 @@ const TrainingManagement = () => {
     ativo: true,
     dataExpiracao: '',
     perguntas: [],
-    arquivosComplementares: [] // Alterado para array
+    arquivosComplementares: []
   };
   
   const [formData, setFormData] = useState(initialFormData);
@@ -54,9 +56,9 @@ const TrainingManagement = () => {
 
   const loadData = () => {
     const database = getDatabase();
-    setTrainings(database.treinamentos);
-    setCategories(database.categorias);
-    setDepartments(database.departamentos);
+    setTrainings(database.treinamentos || []);
+    setCategories(database.categorias || []);
+    setDepartments(database.departamentos || []);
   };
 
   const getCategoryName = (categoryId) => {
@@ -74,67 +76,67 @@ const TrainingManagement = () => {
     setFormData({
       ...training,
       categoriaId: training.categoriaId.toString(),
-      // Garante que os campos sejam arrays vazios se não existirem
       arquivosComplementares: training.arquivosComplementares || [],
       perguntas: training.perguntas || [],
       dataExpiracao: training.dataExpiracao || ''
     });
-    setIsDialogOpen(true);
+    setIsFormOpen(true);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Validação para garantir que cada pergunta tem uma resposta correta
     if (formData.perguntas.some(q => q.respostaCorreta === undefined || q.respostaCorreta === null)) {
-        toast({
-            title: "Erro de Validação",
-            description: "Todas as perguntas devem ter uma resposta correta selecionada.",
-            variant: "destructive",
-        });
+        toast({ title: "Erro de Validação", description: "Todas as perguntas devem ter uma resposta correta.", variant: "destructive" });
         return;
     }
 
     const database = getDatabase();
-    const preparedData = {
-      ...formData,
-      categoriaId: parseInt(formData.categoriaId),
-      dataExpiracao: formData.dataExpiracao || null,
-    };
+    const preparedData = { ...formData, categoriaId: parseInt(formData.categoriaId), dataExpiracao: formData.dataExpiracao || null };
 
     if (editingTraining) {
-      const updatedTrainings = database.treinamentos.map(t =>
-        t.id === editingTraining.id ? { ...t, ...preparedData } : t
-      );
+      const updatedTrainings = database.treinamentos.map(t => t.id === editingTraining.id ? { ...t, ...preparedData } : t);
       updateDatabase({ ...database, treinamentos: updatedTrainings });
-      toast({ title: "Treinamento atualizado com sucesso!" });
+      toast({ title: "Treinamento atualizado!" });
     } else {
       const newTraining = {
         ...preparedData,
-        id: Math.max(...database.treinamentos.map(t => t.id), 0) + 1,
+        id: Math.max(0, ...(database.treinamentos || []).map(t => t.id)) + 1,
         dataPublicacao: new Date().toISOString().split('T')[0]
       };
-      updateDatabase({ ...database, treinamentos: [...database.treinamentos, newTraining] });
-      toast({ title: "Treinamento criado com sucesso!" });
+      updateDatabase({ ...database, treinamentos: [...(database.treinamentos || []), newTraining] });
+      toast({ title: "Treinamento criado!" });
     }
 
     loadData();
     resetForm();
-    setIsDialogOpen(false);
+    setIsFormOpen(false);
   };
-  
-  // --- NOVAS FUNÇÕES PARA GERENCIAR PERGUNTAS ---
+
+  const handleDeleteClick = (training) => {
+    setTrainingToDelete(training);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!trainingToDelete) return;
+
+    const database = getDatabase();
+    const updatedTrainings = (database.treinamentos || []).filter(t => t.id !== trainingToDelete.id);
+    updateDatabase({ ...database, treinamentos: updatedTrainings });
+
+    toast({ title: "Treinamento removido!", description: `"${trainingToDelete.titulo}" foi removido com sucesso.` });
+    
+    setTrainingToDelete(null);
+    setIsConfirmOpen(false);
+    loadData();
+  };
+
   const handleAddQuestion = () => {
-    setFormData(prev => ({
-      ...prev,
-      perguntas: [...prev.perguntas, { pergunta: '', opcoes: ['', '', '', ''], respostaCorreta: null }]
-    }));
+    setFormData(prev => ({ ...prev, perguntas: [...prev.perguntas, { pergunta: '', opcoes: ['', '', '', ''], respostaCorreta: null }] }));
   };
 
   const handleRemoveQuestion = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      perguntas: prev.perguntas.filter((_, i) => i !== index)
-    }));
+    setFormData(prev => ({ ...prev, perguntas: prev.perguntas.filter((_, i) => i !== index) }));
   };
 
   const handleQuestionChange = (index, value) => {
@@ -155,10 +157,8 @@ const TrainingManagement = () => {
     setFormData({ ...formData, perguntas: newQuestions });
   };
 
-  // --- NOVAS FUNÇÕES PARA UPLOAD DE ARQUIVOS ---
   const handleFileSelect = (event) => {
       const files = Array.from(event.target.files);
-      // Aqui estamos apenas armazenando os nomes. Numa app real, você faria o upload.
       const fileNames = files.map(file => file.name);
       setFormData(prev => ({
           ...prev,
@@ -181,7 +181,7 @@ const TrainingManagement = () => {
           <h1 className="text-3xl font-bold text-white">Gerenciamento de Treinamentos</h1>
           <p className="text-slate-400">Crie, edite e gerencie os treinamentos da plataforma.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-blue-500 to-purple-600" onClick={resetForm}>
               <Plus className="w-4 h-4 mr-2" /> Novo Treinamento
@@ -192,8 +192,7 @@ const TrainingManagement = () => {
               <DialogTitle>{editingTraining ? 'Editar' : 'Novo'} Treinamento</DialogTitle>
               <DialogDescription>Preencha os detalhes do treinamento e adicione o conteúdo.</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto scrollbar-thin pr-4">
-              {/* --- Campos Principais --- */}
+            <form id="trainingForm" onSubmit={handleSubmit} className="space-y-6 overflow-y-auto scrollbar-thin pr-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="titulo">Título</Label>
@@ -231,7 +230,6 @@ const TrainingManagement = () => {
                   <div className="flex items-center space-x-2"><Switch id="ativo" checked={formData.ativo} onCheckedChange={checked => setFormData({...formData, ativo: checked})} /><Label htmlFor="ativo">Ativo</Label></div>
               </div>
               
-              {/* --- SEÇÃO DE ARQUIVOS --- */}
               <div className="space-y-3 pt-4 border-t border-slate-700">
                   <h3 className="text-lg font-semibold text-white">Arquivos Complementares</h3>
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current.click()}>
@@ -250,7 +248,6 @@ const TrainingManagement = () => {
                   </div>
               </div>
 
-              {/* --- SEÇÃO DE PERGUNTAS --- */}
               <div className="space-y-4 pt-4 border-t border-slate-700">
                 <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold text-white">Questionário</h3>
@@ -278,8 +275,7 @@ const TrainingManagement = () => {
               </div>
             </form>
             <DialogFooter className="pt-4 border-t border-slate-700">
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-slate-600">Cancelar</Button>
-              {/* O botão de submit agora está atrelado ao form via ID */}
+              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} className="border-slate-600">Cancelar</Button>
               <Button type="submit" form="trainingForm" className="bg-gradient-to-r from-blue-500 to-purple-600">{editingTraining ? 'Salvar' : 'Criar'}</Button>
             </DialogFooter>
           </DialogContent>
@@ -293,7 +289,6 @@ const TrainingManagement = () => {
         </div>
       </motion.div>
 
-      {/* --- Grid de Treinamentos (Exibição) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTrainings.map((training, index) => (
           <motion.div key={training.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
@@ -308,29 +303,30 @@ const TrainingManagement = () => {
               </CardHeader>
               <CardContent className="flex-grow space-y-3">
                 <p className="text-sm text-slate-300 line-clamp-3 flex-grow">{training.descricao}</p>
-                <div className="text-xs text-slate-400 space-y-1 pt-2 border-t border-slate-700">
-                  <div className="flex items-center gap-2"><Users className="w-3 h-3"/><span>Departamento: {training.departamento}</span></div>
-                  <div className="flex items-center gap-2"><FileText className="w-3 h-3"/><span>Arquivos: {(training.arquivosComplementares || []).length}</span></div>
-                  <div className="flex items-center gap-2"><HelpCircle className="w-3 h-3"/><span>Perguntas: {(training.perguntas || []).length}</span></div>
-                </div>
               </CardContent>
               <CardFooter className="flex justify-end space-x-2">
                 <Button size="sm" variant="outline" className="border-slate-600" onClick={() => handleEdit(training)}><Edit className="w-4 h-4" /></Button>
-                <Button size="sm" variant="outline" className="border-slate-600 hover:bg-red-500/20" onClick={() => handleDelete(training.id)}><Trash2 className="w-4 h-4" /></Button>
+                <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(training)}><Trash2 className="w-4 h-4" /></Button>
               </CardFooter>
             </Card>
           </motion.div>
         ))}
       </div>
-      {filteredTrainings.length === 0 && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-          <BookOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400 text-lg">Nenhum treinamento encontrado</p>
-        </motion.div>
-      )}
+
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent className="glass-effect border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="text-red-500"/>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>Tem certeza que deseja remover o treinamento "{trainingToDelete?.titulo}"? Esta ação não pode ser desfeita.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Sim, Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default TrainingManagement;
-

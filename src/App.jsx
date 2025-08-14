@@ -35,36 +35,23 @@ const MainApp = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      // Rotas do Administrador
-      case 'dashboard':
-        return <Dashboard setActiveTab={setActiveTab} />;
-      case 'usuarios':
-        return <UserManagement />;
-      case 'treinamentos':
-        return <TrainingManagement />;
-      case 'trilhas':
-        return <LearningPathManagement />;
-      case 'categorias':
-        return <CategoryManagement />;
-      case 'departamentos':
-        return <DepartmentManagement />;
-      case 'relatorios':
-        return <Reports />;
-      case 'configuracoes':
-        return <Settings />;
+      // Admin
+      case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
+      case 'usuarios': return <UserManagement />;
+      case 'treinamentos': return <TrainingManagement />;
+      case 'trilhas': return <LearningPathManagement />;
+      case 'categorias': return <CategoryManagement />;
+      case 'departamentos': return <DepartmentManagement />;
+      case 'relatorios': return <Reports />;
+      case 'configuracoes': return <Settings />;
       
-      // Rotas do Funcionário
-      case 'meus-treinamentos':
-        return <TrainingList />;
-      case 'minhas-trilhas':
-        return <LearningPathList />;
-      case 'progresso':
-        return <Progress />;
-      case 'ranking':
-        return <Ranking />;
+      // Employee
+      case 'meus-treinamentos': return <TrainingList />;
+      case 'minhas-trilhas': return <LearningPathList />;
+      case 'progresso': return <Progress />;
+      case 'ranking': return <Ranking />;
       
-      default:
-        return isAdmin() ? <Dashboard setActiveTab={setActiveTab} /> : <TrainingList />;
+      default: return isAdmin() ? <Dashboard setActiveTab={setActiveTab} /> : <TrainingList />;
     }
   };
 
@@ -103,9 +90,6 @@ function App() {
     <AuthProvider>
       <Helmet>
         <title>Central de Treinamento</title>
-        <meta name="description" content="Plataforma completa de treinamento online para área contábil com controle de usuários, treinamentos e relatórios de progresso." />
-        <meta property="og:title" content="Central de Treinamento" />
-        <meta property="og:description" content="Plataforma completa de treinamento online para área contábil." />
       </Helmet>
       <MainApp />
       <Toaster />

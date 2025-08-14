@@ -23,7 +23,9 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'usuarios', label: 'Usuários', icon: Users },
     { id: 'treinamentos', label: 'Treinamentos', icon: BookOpen },
-    { id: 'trilhas', label: 'Trilhas', icon: GitMerge }, // Item adicionado
+    // --- CORREÇÃO AQUI ---
+    // Adiciona o item "Trilhas" que estava em falta no menu do administrador
+    { id: 'trilhas', label: 'Trilhas', icon: GitMerge }, 
     { id: 'categorias', label: 'Categorias', icon: FolderOpen },
     { id: 'departamentos', label: 'Departamentos', icon: Building },
     { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
@@ -32,7 +34,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
 
   const funcionarioMenuItems = [
     { id: 'meus-treinamentos', label: 'Meus Treinamentos', icon: GraduationCap },
-    { id: 'minhas-trilhas', label: 'Minhas Trilhas', icon: GitMerge }, // Item adicionado
+    { id: 'minhas-trilhas', label: 'Minhas Trilhas', icon: GitMerge },
     { id: 'progresso', label: 'Meu Progresso', icon: BarChart3 },
     { id: 'ranking', label: 'Ranking', icon: Trophy }
   ];
@@ -45,6 +47,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
       animate={{ x: 0 }}
       className="w-64 bg-slate-800/50 backdrop-blur-lg border-r border-slate-700 h-screen flex flex-col"
     >
+      {/* Header e User Info (sem alterações) */}
       <div className="p-6 border-b border-slate-700">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -67,6 +70,8 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
           </div>
         </div>
       </div>
+      
+      {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
@@ -89,6 +94,8 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
           );
         })}
       </nav>
+
+      {/* Logout */}
       <div className="p-4 border-t border-slate-700">
         <Button onClick={onLogout} variant="ghost" className="w-full justify-start text-slate-300 hover:text-white hover:bg-red-500/20">
           <LogOut className="w-5 h-5 mr-3" />

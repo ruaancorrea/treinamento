@@ -1,4 +1,3 @@
-// --- src/components/Admin/UserManagement.jsx ---
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Edit, Trash2, UserCheck, UserX, Mail, Building, Calendar } from 'lucide-react';
@@ -6,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
@@ -15,7 +14,7 @@ import { getDatabase, updateDatabase } from '@/data/mockData';
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
-  const [departments, setDepartments] = useState([]); // Estado para departamentos
+  const [departments, setDepartments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -37,16 +36,16 @@ const UserManagement = () => {
     const filtered = users.filter(user =>
       user.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.departamento.toLowerCase().includes(searchTerm.toLowerCase())
+      (user.departamento && user.departamento.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     setFilteredUsers(filtered);
   }, [users, searchTerm]);
 
   const loadData = () => {
     const database = getDatabase();
-    setUsers(database.usuarios);
-    setDepartments(database.departamentos); // Carrega os departamentos
-    if (database.departamentos.length > 0) {
+    setUsers(database.usuarios || []);
+    setDepartments(database.departamentos || []);
+    if (database.departamentos && database.departamentos.length > 0) {
         setFormData(prev => ({...prev, departamento: database.departamentos[0].nome}));
     }
   };
@@ -63,11 +62,11 @@ const UserManagement = () => {
       toast({ title: "Usuário atualizado!" });
     } else {
       const newUser = {
-        id: Math.max(...database.usuarios.map(u => u.id), 0) + 1,
+        id: Math.max(0, ...(database.usuarios || []).map(u => u.id)) + 1,
         ...formData,
         dataCriacao: new Date().toISOString().split('T')[0]
       };
-      updateDatabase({ ...database, usuarios: [...database.usuarios, newUser] });
+      updateDatabase({ ...database, usuarios: [...(database.usuarios || []), newUser] });
       toast({ title: "Usuário criado!" });
     }
     
@@ -90,6 +89,7 @@ const UserManagement = () => {
   };
 
   const handleDelete = (userId) => {
+    if (!window.confirm("Tem certeza que deseja remover este usuário?")) return;
     const database = getDatabase();
     const updatedUsers = database.usuarios.filter(user => user.id !== userId);
     updateDatabase({ ...database, usuarios: updatedUsers });
@@ -136,14 +136,14 @@ const UserManagement = () => {
             <DialogHeader>
               <DialogTitle>{editingUser ? 'Editar' : 'Novo'} Usuário</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* ... outros campos do formulário ... */}
+            {/* --- CORREÇÃO: Adicionado o ID ao formulário --- */}
+            <form id="userForm" onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label htmlFor="nome">Nome</Label><Input id="nome" value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} className="bg-slate-800/50" required /></div>
                 <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="bg-slate-800/50" required /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label htmlFor="senha">Senha</Label><Input id="senha" type="password" value={formData.senha} onChange={(e) => setFormData({...formData, senha: e.target.value})} className="bg-slate-800/50" required /></div>
+                <div className="space-y-2"><Label htmlFor="senha">Senha</Label><Input id="senha" type="password" placeholder={editingUser ? 'Deixe em branco para não alterar' : ''} onChange={(e) => setFormData({...formData, senha: e.target.value})} className="bg-slate-800/50" required={!editingUser} /></div>
                 <div className="space-y-2"><Label htmlFor="tipo">Tipo</Label><Select value={formData.tipo} onValueChange={(value) => setFormData({...formData, tipo: value})}><SelectTrigger className="bg-slate-800/50"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="admin">Administrador</SelectItem><SelectItem value="funcionario">Funcionário</SelectItem></SelectContent></Select></div>
               </div>
               <div className="space-y-2">
@@ -151,23 +151,21 @@ const UserManagement = () => {
                 <Select value={formData.departamento} onValueChange={(value) => setFormData({...formData, departamento: value})}>
                   <SelectTrigger className="bg-slate-800/50"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
-                    {/* Lista de departamentos agora é dinâmica */}
                     {departments.map(dept => (
                       <SelectItem key={dept.id} value={dept.nome}>{dept.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-slate-600">Cancelar</Button>
-                <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600">{editingUser ? 'Atualizar' : 'Criar'}</Button>
-              </div>
             </form>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-slate-600">Cancelar</Button>
+              <Button type="submit" form="userForm" className="bg-gradient-to-r from-blue-500 to-purple-600">{editingUser ? 'Atualizar' : 'Criar'}</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </motion.div>
 
-      {/* ... restante do componente UserManagement ... */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
         <Input placeholder="Buscar usuários..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-slate-800/50 border-slate-600" />
