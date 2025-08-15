@@ -86,7 +86,7 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete }) => {
       updateDatabase({ ...database, historico: updatedHistorico });
     } else {
       const newProgress = {
-        id: Math.max(...database.historico.map(h => h.id), 0) + 1,
+        id: Math.max(0, ...(database.historico.map(h => h.id) || [0])) + 1,
         usuarioId: user.id,
         treinamentoId: training.id,
         concluido: true,
@@ -102,10 +102,16 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete }) => {
     onComplete();
   };
 
-  const downloadFile = (fileName) => {
-    toast({
-      title: "🚧 Esta funcionalidade ainda não foi implementada—mas não se preocupe! Você pode solicitá-la no seu próximo prompt! 🚀",
-    });
+  const downloadFile = (file) => {
+    if (file && file.url) {
+      window.open(file.url, '_blank');
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível encontrar a URL do arquivo.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleClose = () => {
@@ -120,7 +126,7 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete }) => {
         {!showQuiz ? (
           <div className="space-y-6">
             <div className="aspect-video bg-slate-800 rounded-lg overflow-hidden">
-              <iframe src={training.video} className="w-full h-full" frameBorder="0" allowFullScreen title={training.titulo} />
+              <iframe src={training.video} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={training.titulo} />
             </div>
             <div className="space-y-4">
               <p className="text-slate-300">{training.descricao}</p>
@@ -128,9 +134,10 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete }) => {
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-2">Arquivos Complementares</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* --- MUDANÇA AQUI: Mapeia todos os arquivos e cria um botão para cada --- */}
                     {training.arquivosComplementares.map((file, index) => (
                       <Button key={index} variant="outline" onClick={() => downloadFile(file)} className="justify-start border-slate-600 hover:bg-slate-700">
-                        <Download className="w-4 h-4 mr-2" /> {file}
+                        <Download className="w-4 h-4 mr-2" /> {file.name}
                       </Button>
                     ))}
                   </div>

@@ -1,13 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Download, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Play, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
 
 const TrainingCard = ({ training, userProgress, categories, onStartTraining, index }) => {
-  const { toast } = useToast();
 
   const getCategoryProp = (categoryId, prop) => {
     const category = categories.find(c => c.id === categoryId);
@@ -22,12 +20,6 @@ const TrainingCard = ({ training, userProgress, categories, onStartTraining, ind
   };
   
   const status = getStatus();
-  
-  const downloadFile = (fileName) => {
-    toast({
-      title: "🚧 Esta funcionalidade ainda não foi implementada—mas não se preocupe! Você pode solicitá-la no seu próximo prompt! 🚀",
-    });
-  };
 
   return (
     <motion.div
@@ -55,7 +47,7 @@ const TrainingCard = ({ training, userProgress, categories, onStartTraining, ind
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-4 flex-grow flex flex-col">
+        <CardContent className="space-y-4 flex-grow flex flex-col justify-end">
           <p className="text-sm text-slate-300 line-clamp-3 flex-grow">{training.descricao}</p>
           
           {userProgress && (
@@ -76,7 +68,8 @@ const TrainingCard = ({ training, userProgress, categories, onStartTraining, ind
             </div>
           )}
           
-          <div className="pt-4 border-t border-slate-700 space-y-2">
+          {/* --- MUDANÇA AQUI: Botão de download removido para simplificar --- */}
+          <div className="pt-4 border-t border-slate-700">
              <Button
                 onClick={onStartTraining}
                 className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
@@ -85,15 +78,6 @@ const TrainingCard = ({ training, userProgress, categories, onStartTraining, ind
                 <Play className="w-4 h-4 mr-2" />
                 {status === 'completed' ? 'Concluído' : 'Assistir'}
               </Button>
-            
-            {(training.arquivosComplementares || []).length > 0 && (
-                <div className="text-center">
-                  <Button variant="link" size="sm" onClick={() => downloadFile(training.arquivosComplementares[0])} className="text-blue-400">
-                    <Download className="w-3 h-3 mr-1" />
-                    Baixar arquivos
-                  </Button>
-                </div>
-            )}
           </div>
         </CardContent>
       </Card>
