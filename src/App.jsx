@@ -82,9 +82,25 @@ const MainApp = () => {
 };
 
 function App() {
+  const [dbLoaded, setDbLoaded] = useState(false);
+
   useEffect(() => {
-    initializeDatabase();
+    const loadDb = async () => {
+      await initializeDatabase();
+      setDbLoaded(true);
+    };
+    loadDb();
   }, []);
+
+  // Mostra um loading enquanto o banco de dados carrega
+  if (!dbLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+        <p className="text-white ml-4">Carregando banco de dados...</p>
+      </div>
+    );
+  }
 
   return (
     <AuthProvider>
