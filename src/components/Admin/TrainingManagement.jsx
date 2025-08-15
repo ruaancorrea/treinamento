@@ -153,10 +153,10 @@ const TrainingManagement = () => {
     setLinkUrl('');
   };
 
-  const handleRemoveFile = (fileNameToRemove) => {
+  const handleRemoveFile = (indexToRemove) => {
       setFormData(prev => ({
           ...prev,
-          arquivosComplementares: prev.arquivosComplementares.filter(f => f.name !== fileNameToRemove)
+          arquivosComplementares: prev.arquivosComplementares.filter((_, index) => index !== indexToRemove)
       }));
   };
 
@@ -208,10 +208,11 @@ const TrainingManagement = () => {
                   </Button>
                   
                   <div className="space-y-2 pt-2">
-                      {(formData.arquivosComplementares || []).map(file => (
-                          <div key={file.name} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
+                      {/* --- CORREÇÃO AQUI --- */}
+                      {(formData.arquivosComplementares || []).map((file, index) => (
+                          <div key={`${file.name}-${index}`} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
                               <span className="text-sm text-slate-300">{file.name}</span>
-                              <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleRemoveFile(file.name)}>
+                              <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleRemoveFile(index)}>
                                   <XCircle className="w-4 h-4 text-red-500"/>
                               </Button>
                           </div>
