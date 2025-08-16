@@ -105,7 +105,7 @@ function App() {
   return (
     <AuthProvider>
       <Helmet>
-        <title>Central de Treinamento</title>
+        <title>Central de Treinamento NTW</title>
       </Helmet>
       <MainApp />
       <Toaster />

@@ -55,7 +55,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
           </div>
           <div>
             <span className="text-lg font-bold text-white">Central de</span>
-            <p className="text-sm text-slate-300">Treinamento</p>
+            <p className="text-sm text-slate-300">Treinamento NTW</p>
           </div>
         </div>
       </div>

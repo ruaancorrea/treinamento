@@ -76,7 +76,7 @@ const LoginForm = () => {
             </motion.div>
             <div>
               <CardTitle className="text-2xl font-bold text-white">
-                Central de Treinamento
+                Central de Treinamento NTW
               </CardTitle>
               <CardDescription className="text-slate-300">
                 Faça login para acessar sua conta
