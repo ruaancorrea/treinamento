@@ -12,6 +12,7 @@ const Progress = () => {
     useEffect(() => {
         if (user) {
             const db = getDatabase();
+            if(!db) return;
             
             // Trainings available to the user
             const availableTrainings = db.treinamentos.filter(t => 
@@ -49,7 +50,7 @@ const Progress = () => {
     }, [user]);
 
     if (!progressData) {
-        return <div className="text-center text-slate-400">Carregando seu progresso...</div>;
+        return <div className="text-center text-slate-400">A carregar o seu progresso...</div>;
     }
 
     const statCards = [
@@ -63,7 +64,7 @@ const Progress = () => {
         <div className="space-y-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                 <h1 className="text-3xl font-bold text-white">Meu Progresso</h1>
-                <p className="text-slate-400">Acompanhe sua jornada de aprendizado.</p>
+                <p className="text-slate-400">Acompanhe a sua jornada de aprendizado.</p>
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -75,7 +76,7 @@ const Progress = () => {
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                                     <CardTitle className="text-sm font-medium text-slate-200">{stat.title}</CardTitle>
                                     <div className={`p-2 rounded-lg bg-gradient-to-r from-${stat.color}-500 to-${stat.color}-600`}>
-                                      <Icon className="h-4 w-4 text-white" />
+                                        <Icon className="h-4 w-4 text-white" />
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -92,14 +93,16 @@ const Progress = () => {
                 <Card className="glass-effect border-slate-700">
                     <CardHeader>
                         <CardTitle className="text-white">Últimos Treinamentos Concluídos</CardTitle>
-                        <CardDescription>Sua atividade mais recente na plataforma.</CardDescription>
+                        <CardDescription>A sua atividade mais recente na plataforma.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {progressData.recentCompletions.length > 0 ? (
                             <ul className="space-y-3">
                                 {progressData.recentCompletions.map((item, index) => (
+                                    // --- CORREÇÃO AQUI ---
+                                    // Adicionada a propriedade key para dar uma identidade única a cada item da lista
                                     <motion.li 
-                                      key={item.id}
+                                      key={`${item.id}-${index}`} // Usar uma combinação para garantir unicidade em caso de repetições
                                       initial={{ opacity: 0, x: -10 }}
                                       animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: 0.1 * index }}

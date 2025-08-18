@@ -1,29 +1,27 @@
+// src/contexts/DatabaseContext.jsx
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from '@/firebaseConfig';
-import { updateDatabase, mockDatabase } from '@/data/mockData';
+import { updateDatabase } from '@/data/mockData';
 
-// 1. Cria o contexto que vai guardar os dados
+// 1. Cria o contexto
 const DatabaseContext = createContext();
 
-// 2. Cria o "Provedor" que vai gerenciar e distribuir os dados
+// 2. Cria o "Provedor"
 export const DatabaseProvider = ({ children }) => {
   const [database, setDatabase] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Referência para o nosso documento único no Firestore
     const docRef = doc(db, "main", "database");
 
-    // onSnapshot é a mágica: ele "ouve" as mudanças no documento em tempo real
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
-        // Se o documento existe, atualiza nosso estado com os novos dados
         setDatabase(docSnap.data());
       } else {
-        // Se não existe (primeiro uso), cria ele com os dados mock
-        console.log("Nenhum banco de dados encontrado. Criando um novo...");
-        updateDatabase(mockDatabase);
+        console.warn("Documento do banco de dados não encontrado no Firestore.");
+        setDatabase(null); 
       }
       setLoading(false);
     }, (error) => {
@@ -31,18 +29,44 @@ export const DatabaseProvider = ({ children }) => {
       setLoading(false);
     });
 
-    // Função de limpeza: para de ouvir quando o componente é desmontado
     return () => unsubscribe();
   }, []);
 
+  // --- INÍCIO DA CORREÇÃO ---
+  // A função `retakeTraining` precisa ser definida aqui.
+  const retakeTraining = (userId, trainingId) => {
+    if (database && database.historico) {
+      const historyIndex = database.historico.findIndex(h => h.usuarioId === userId && h.treinamentoId === trainingId);
+
+      if (historyIndex !== -1) {
+        const updatedHistorico = [...database.historico];
+        updatedHistorico[historyIndex] = {
+          ...updatedHistorico[historyIndex],
+          concluido: false,
+          dataConclusao: null,
+          notaQuestionario: null,
+          tempoAssistido: 0,
+        };
+        
+        updateDatabase({ ...database, historico: updatedHistorico });
+      }
+    }
+  };
+  // --- FIM DA CORREÇÃO ---
+
   return (
-    <DatabaseContext.Provider value={{ database, loading }}>
+    // Agora a função `retakeTraining` existe e pode ser passada no value.
+    <DatabaseContext.Provider value={{ database, loading, retakeTraining }}>
       {children}
     </DatabaseContext.Provider>
   );
 };
 
-// 3. Cria um hook customizado para facilitar o uso dos dados nos componentes
+// 3. Cria um hook customizado
 export const useDatabase = () => {
-  return useContext(DatabaseContext);
+  const context = useContext(DatabaseContext);
+  if (!context) {
+    throw new Error("useDatabase must be used within a DatabaseProvider");
+  }
+  return context;
 };

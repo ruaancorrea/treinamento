@@ -12,23 +12,42 @@ const Ranking = () => {
 
     useEffect(() => {
         const db = getDatabase();
+        if (!db || !db.usuarios || !db.historico) return;
+
         const users = db.usuarios.filter(u => u.tipo === 'funcionario' && u.ativo);
         const history = db.historico.filter(h => h.concluido);
         
         const userScores = users.map(u => {
-            const completedCount = history.filter(h => h.usuarioId === u.id).length;
-            const totalScore = history
-                .filter(h => h.usuarioId === u.id)
-                .reduce((acc, h) => acc + (h.notaQuestionario || 0), 0);
+            const userHistory = history.filter(h => h.usuarioId === u.id);
             
-            // Simple scoring: 10 points per completion + average score
+            // --- INÍCIO DA LÓGICA CORRIGIDA ---
+
+            // 1. Agrupa o histórico por treinamento, guardando a melhor nota para cada um.
+            const bestScoresByTraining = userHistory.reduce((acc, h) => {
+                const existing = acc[h.treinamentoId];
+                if (!existing || h.notaQuestionario > existing.notaQuestionario) {
+                    acc[h.treinamentoId] = h;
+                }
+                return acc;
+            }, {});
+
+            // 2. Converte o objeto de melhores notas num array.
+            const uniqueBestHistory = Object.values(bestScoresByTraining);
+
+            // 3. Calcula os novos totais com base nos treinamentos únicos e melhores notas.
+            const completedCount = uniqueBestHistory.length;
+            const totalScore = uniqueBestHistory.reduce((acc, h) => acc + (h.notaQuestionario || 0), 0);
+            
+            // Lógica de pontuação: 10 pontos por treinamento único concluído + média das melhores notas.
             const finalScore = (completedCount * 10) + (completedCount > 0 ? totalScore / completedCount : 0);
+
+            // --- FIM DA LÓGICA CORRIGIDA ---
 
             return {
                 id: u.id,
                 nome: u.nome,
                 departamento: u.departamento,
-                completedCount,
+                completedCount, // Agora conta treinamentos únicos
                 finalScore: finalScore.toFixed(2),
             };
         });
@@ -39,7 +58,7 @@ const Ranking = () => {
         const currentUserRank = sortedRanking.findIndex(u => u.id === user.id) + 1;
         setUserRank(currentUserRank > 0 ? currentUserRank : null);
 
-    }, [user]);
+    }, [user, getDatabase()]); // Adicionado getDatabase() para reatividade
 
     const getRankIcon = (rank) => {
         if (rank === 1) return <Trophy className="w-6 h-6 text-yellow-400" />;

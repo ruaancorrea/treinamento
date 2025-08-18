@@ -35,13 +35,16 @@ const toastVariants = cva(
 );
 
 const Toast = React.forwardRef(({ className, variant, ...props }, ref) => {
-	return (
-		<ToastPrimitives.Root
-			ref={ref}
-			className={cn(toastVariants({ variant }), className)}
-			{...props}
-		/>
-	);
+  // Destructure the non-standard prop out so it doesn't get passed down
+  const { dismiss, ...rest } = props; 
+  
+  return (
+    <ToastPrimitives.Root
+      ref={ref}
+      className={cn(toastVariants({ variant }), className)}
+      {...rest} // Pass the "rest" of the props
+    />
+  )
 });
 Toast.displayName = ToastPrimitives.Root.displayName;
 

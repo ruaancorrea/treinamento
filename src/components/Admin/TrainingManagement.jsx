@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Edit, Trash2, Link, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const TrainingManagement = () => {
-  // Estados principais (sem alteração)
+  // Estados principais
   const [trainings, setTrainings] = useState([]);
   const [filteredTrainings, setFilteredTrainings] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -26,7 +26,7 @@ const TrainingManagement = () => {
   const [trainingToDelete, setTrainingToDelete] = useState(null);
   const [editingTraining, setEditingTraining] = useState(null);
 
-  // Novos estados para controlar os inputs de link
+  // Estados para controlar os inputs de link
   const [linkName, setLinkName] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   
@@ -131,14 +131,12 @@ const TrainingManagement = () => {
     loadData();
   };
 
-  // Funções do questionário (sem alteração)
   const handleAddQuestion = () => setFormData(prev => ({ ...prev, perguntas: [...prev.perguntas, { pergunta: '', opcoes: ['', '', '', ''], respostaCorreta: null }] }));
   const handleRemoveQuestion = (index) => setFormData(prev => ({ ...prev, perguntas: prev.perguntas.filter((_, i) => i !== index) }));
   const handleQuestionChange = (index, value) => { const newQuestions = [...formData.perguntas]; newQuestions[index].pergunta = value; setFormData({ ...formData, perguntas: newQuestions }); };
   const handleOptionChange = (qIndex, oIndex, value) => { const newQuestions = [...formData.perguntas]; newQuestions[qIndex].opcoes[oIndex] = value; setFormData({ ...formData, perguntas: newQuestions }); };
   const handleCorrectAnswerChange = (qIndex, oIndex) => { const newQuestions = [...formData.perguntas]; newQuestions[qIndex].respostaCorreta = oIndex; setFormData({ ...formData, perguntas: newQuestions }); };
 
-  // --- NOVA LÓGICA PARA ADICIONAR LINKS ---
   const handleAddLink = () => {
     if (!linkName.trim() || !linkUrl.trim()) {
       toast({ title: "Campos vazios", description: "Preencha o nome e a URL do link.", variant: "destructive" });
@@ -148,7 +146,6 @@ const TrainingManagement = () => {
       ...prev,
       arquivosComplementares: [...(prev.arquivosComplementares || []), { name: linkName, url: linkUrl }]
     }));
-    // Limpa os campos após adicionar
     setLinkName('');
     setLinkUrl('');
   };
@@ -179,18 +176,31 @@ const TrainingManagement = () => {
               <DialogDescription>Preencha os detalhes do treinamento e adicione o conteúdo.</DialogDescription>
             </DialogHeader>
             <form id="trainingForm" onSubmit={handleSubmit} className="space-y-6 overflow-y-auto scrollbar-thin pr-4">
-              {/* Campos do formulário (sem alteração) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label htmlFor="titulo">Título</Label><Input id="titulo" value={formData.titulo} onChange={e => setFormData({...formData, titulo: e.target.value})} className="bg-slate-800/50" required /></div>
                 <div className="space-y-2"><Label htmlFor="video">URL do Vídeo (Embed)</Label><Input id="video" value={formData.video} onChange={e => setFormData({...formData, video: e.target.value})} className="bg-slate-800/50" required /></div>
-                <div className="space-y-2"><Label htmlFor="categoriaId">Categoria</Label><Select value={formData.categoriaId} onValueChange={value => setFormData({...formData, categoriaId: value})}><SelectTrigger className="bg-slate-800/50"><SelectValue placeholder="Selecione..." /></SelectTrigger><SelectContent>{categories.map(cat => <SelectItem key={cat.id} value={cat.id.toString()}>{cat.nome}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><Label htmlFor="departamento">Departamento</Label><Select value={formData.departamento} onValueChange={value => setFormData({...formData, departamento: value})}><SelectTrigger className="bg-slate-800/50"><SelectValue /></SelectTrigger><SelectContent>{departments.map(dep => <SelectItem key={dep.id} value={dep.nome}>{dep.nome}</SelectItem>)}</SelectContent></Select></div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="categoriaId">Categoria</Label>
+                  <Select value={formData.categoriaId} onValueChange={value => setFormData({...formData, categoriaId: value})}>
+                    <SelectTrigger className="bg-slate-800/50"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>{categories.map(cat => <SelectItem key={cat.id} value={cat.id.toString()}>{cat.nome}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="departamento">Departamento</Label>
+                  <Select value={formData.departamento} onValueChange={value => setFormData({...formData, departamento: value})}>
+                    <SelectTrigger className="bg-slate-800/50"><SelectValue /></SelectTrigger>
+                    {/* --- CORREÇÃO AQUI: A key deve ser dep.id, que é único --- */}
+                    <SelectContent>{departments.map(dep => <SelectItem key={dep.id} value={dep.nome}>{dep.nome}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2"><Label htmlFor="descricao">Descrição</Label><Textarea id="descricao" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="bg-slate-800/50" /></div>
               <div className="space-y-2"><Label htmlFor="dataExpiracao">Data de Expiração (Opcional)</Label><Input type="date" id="dataExpiracao" value={formData.dataExpiracao} onChange={e => setFormData({...formData, dataExpiracao: e.target.value})} className="bg-slate-800/50" /></div>
               <div className="flex items-center space-x-4"><div className="flex items-center space-x-2"><Switch id="obrigatorio" checked={formData.obrigatorio} onCheckedChange={checked => setFormData({...formData, obrigatorio: checked})} /><Label htmlFor="obrigatorio">Obrigatório</Label></div><div className="flex items-center space-x-2"><Switch id="ativo" checked={formData.ativo} onCheckedChange={checked => setFormData({...formData, ativo: checked})} /><Label htmlFor="ativo">Ativo</Label></div></div>
               
-              {/* --- SEÇÃO DE ARQUIVOS MODIFICADA --- */}
               <div className="space-y-3 pt-4 border-t border-slate-700">
                   <h3 className="text-lg font-semibold text-white">Arquivos Complementares (Links)</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
@@ -208,7 +218,6 @@ const TrainingManagement = () => {
                   </Button>
                   
                   <div className="space-y-2 pt-2">
-                      {/* --- CORREÇÃO AQUI --- */}
                       {(formData.arquivosComplementares || []).map((file, index) => (
                           <div key={`${file.name}-${index}`} className="flex items-center justify-between bg-slate-800/50 p-2 rounded">
                               <span className="text-sm text-slate-300">{file.name}</span>
@@ -220,7 +229,6 @@ const TrainingManagement = () => {
                   </div>
               </div>
 
-              {/* Seção do Questionário (sem alteração) */}
               <div className="space-y-4 pt-4 border-t border-slate-700">
                 <div className="flex justify-between items-center"><h3 className="text-lg font-semibold text-white">Questionário</h3><Button type="button" size="sm" onClick={handleAddQuestion}><Plus className="w-4 h-4 mr-2" /> Adicionar Pergunta</Button></div>
                 {formData.perguntas.map((q, qIndex) => (<div key={qIndex} className="p-4 border border-slate-700 rounded-lg space-y-4 bg-slate-800/30"><div className="flex justify-between items-center"><Label>Pergunta {qIndex + 1}</Label><Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveQuestion(qIndex)}><Trash2 className="w-4 h-4"/></Button></div><Textarea placeholder="Digite a pergunta..." value={q.pergunta} onChange={(e) => handleQuestionChange(qIndex, e.target.value)} required/><RadioGroup value={q.respostaCorreta?.toString()} onValueChange={(value) => handleCorrectAnswerChange(qIndex, parseInt(value))}>{q.opcoes.map((opt, oIndex) => (<div key={oIndex} className="flex items-center gap-2"><RadioGroupItem value={oIndex.toString()} id={`q${qIndex}o${oIndex}`} /><Input placeholder={`Opção ${oIndex + 1}`} value={opt} onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)} required /></div>))}</RadioGroup></div>))}

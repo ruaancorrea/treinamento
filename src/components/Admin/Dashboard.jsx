@@ -12,7 +12,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDatabase } from '@/data/mockData';
 
-// 1. Receba a prop { setActiveTab } aqui
 const Dashboard = ({ setActiveTab }) => { 
   const [stats, setStats] = useState({
     totalUsuarios: 0,
@@ -28,8 +27,9 @@ const Dashboard = ({ setActiveTab }) => {
 
   useEffect(() => {
     const database = getDatabase();
+    if (!database) return;
     
-    // Calcula as estatísticas (lógica inalterada)
+    // Calcula as estatísticas
     const totalUsuarios = database.usuarios.length;
     const usuariosAtivos = database.usuarios.filter(u => u.ativo).length;
     const totalTreinamentos = database.treinamentos.filter(t => t.ativo).length;
@@ -56,7 +56,7 @@ const Dashboard = ({ setActiveTab }) => {
       treinamentosVencendo
     });
 
-    // Obtém a atividade recente (lógica inalterada)
+    // Obtém a atividade recente
     const recent = database.historico
       .filter(h => h.concluido)
       .sort((a, b) => new Date(b.dataConclusao) - new Date(a.dataConclusao))
@@ -121,7 +121,7 @@ const Dashboard = ({ setActiveTab }) => {
           const Icon = stat.icon;
           return (
             <motion.div
-              key={stat.title}
+              key={stat.title} // Chave para a primeira lista
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
@@ -164,8 +164,10 @@ const Dashboard = ({ setActiveTab }) => {
             <CardContent className="space-y-4">
               {recentActivity.length > 0 ? (
                 recentActivity.map((activity, index) => (
+                  // --- CORREÇÃO AQUI ---
+                  // Adicionada a propriedade key para dar uma identidade única a cada item da atividade
                   <motion.div
-                    key={activity.id}
+                    key={`${activity.id}-${index}`} 
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + index * 0.1 }}
@@ -221,7 +223,6 @@ const Dashboard = ({ setActiveTab }) => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full p-3 text-left rounded-lg bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 hover:border-blue-400 transition-colors"
-                // 2. Use a prop para mudar de aba
                 onClick={() => setActiveTab('usuarios')}
               >
                 <div className="flex items-center space-x-3">
@@ -237,7 +238,6 @@ const Dashboard = ({ setActiveTab }) => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full p-3 text-left rounded-lg bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 hover:border-green-400 transition-colors"
-                // 3. Use a prop para mudar de aba
                 onClick={() => setActiveTab('treinamentos')}
               >
                 <div className="flex items-center space-x-3">
@@ -253,7 +253,6 @@ const Dashboard = ({ setActiveTab }) => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full p-3 text-left rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-400 transition-colors"
-                // 4. Use a prop para mudar de aba
                 onClick={() => setActiveTab('relatorios')}
               >
                 <div className="flex items-center space-x-3">

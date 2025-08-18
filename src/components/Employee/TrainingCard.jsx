@@ -1,11 +1,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Play, Clock, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'; // Adicionado RefreshCw
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useDatabase } from '@/contexts/DatabaseContext';
+import { useAuth } from '@/contexts/AuthContext'; // Adicionado useAuth
 
 const TrainingCard = ({ training, userProgress, categories, onStartTraining, index }) => {
+  // Hooks para obter dados de autenticação e do banco de dados
+  const { user } = useAuth();
+  const { retakeTraining } = useDatabase();
 
   const getCategoryProp = (categoryId, prop) => {
     const category = categories.find(c => c.id === categoryId);
@@ -13,13 +18,34 @@ const TrainingCard = ({ training, userProgress, categories, onStartTraining, ind
     if (prop === 'cor') return category?.cor || '#3b82f6';
     return null;
   };
-  
+
   const getStatus = () => {
     if (!userProgress) return 'not-started';
     return userProgress.concluido ? 'completed' : 'in-progress';
   };
-  
+
   const status = getStatus();
+
+  // Função para lidar com a ação de refazer o treinamento
+  const handleRetake = (e) => {
+    e.stopPropagation(); // Impede que o card seja clicado ao mesmo tempo
+    if (user && training) {
+      retakeTraining(user.id, training.id);
+    }
+  };
+
+  // Calcula a porcentagem de progresso real
+  const getProgressPercentage = () => {
+    if (status === 'completed') return 100;
+    if (status === 'in-progress' && userProgress?.tempoAssistido && training?.duracao) {
+      // Garante que não ultrapasse 100% antes de concluir
+      return Math.min(99, Math.round((userProgress.tempoAssistido / training.duracao) * 100));
+    }
+    return 0;
+  };
+
+  const progressPercentage = getProgressPercentage();
+
 
   return (
     <motion.div
@@ -50,16 +76,17 @@ const TrainingCard = ({ training, userProgress, categories, onStartTraining, ind
         <CardContent className="space-y-4 flex-grow flex flex-col justify-end">
           <p className="text-sm text-slate-300 line-clamp-3 flex-grow">{training.descricao}</p>
           
-          {userProgress && (
+          {/* Barra de progresso e nota */}
+          {(status === 'in-progress' || status === 'completed') && userProgress && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Progresso</span>
-                <span className="text-white">{userProgress.concluido ? '100%' : '50%'}</span>
+                <span className="text-white">{progressPercentage}%</span>
               </div>
               <div className="w-full bg-slate-700 rounded-full h-2">
-                <div className="progress-bar h-2 rounded-full" style={{ width: userProgress.concluido ? '100%' : '50%' }} />
+                <div className="progress-bar h-2 rounded-full" style={{ width: `${progressPercentage}%` }} />
               </div>
-              {userProgress.concluido && (
+              {status === 'completed' && userProgress.notaQuestionario !== null && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-400">Nota:</span>
                   <span className="text-green-400 font-semibold">{userProgress.notaQuestionario}/10</span>
@@ -68,16 +95,26 @@ const TrainingCard = ({ training, userProgress, categories, onStartTraining, ind
             </div>
           )}
           
-          {/* --- MUDANÇA AQUI: Botão de download removido para simplificar --- */}
-          <div className="pt-4 border-t border-slate-700">
+          {/* Botões de Ação */}
+          <div className="pt-4 border-t border-slate-700 flex items-center space-x-2">
              <Button
                 onClick={onStartTraining}
                 className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-                disabled={status === 'completed'}
               >
                 <Play className="w-4 h-4 mr-2" />
-                {status === 'completed' ? 'Concluído' : 'Assistir'}
+                {status === 'completed' ? 'Ver Novamente' : (status === 'in-progress' ? 'Continuar' : 'Iniciar')}
               </Button>
+
+              {status === 'completed' && (
+                <Button
+                  onClick={handleRetake}
+                  variant="outline"
+                  className="border-slate-600 hover:bg-slate-700"
+                  title="Refazer Treinamento"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              )}
           </div>
         </CardContent>
       </Card>
