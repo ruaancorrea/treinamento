@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
-  BookOpen, 
+  BookOpen,
   FolderOpen, 
   BarChart3, 
   Settings, 
@@ -11,7 +11,8 @@ import {
   Trophy,
   Home,
   Building,
-  GitMerge // Ícone para Trilhas
+  GitMerge,
+  FileCog // Ícone para Gerenciar Conhecimento
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -22,13 +23,13 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const adminMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'usuarios', label: 'Usuários', icon: Users },
-    { id: 'treinamentos', label: 'Treinamentos', icon: BookOpen },
-    // --- CORREÇÃO AQUI ---
-    // Adiciona o item "Trilhas" que estava em falta no menu do administrador
+    { id: 'treinamentos', label: 'Treinamentos', icon: GraduationCap }, // Ícone mais apropriado
     { id: 'trilhas', label: 'Trilhas', icon: GitMerge }, 
     { id: 'categorias', label: 'Categorias', icon: FolderOpen },
     { id: 'departamentos', label: 'Departamentos', icon: Building },
     { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
+    { id: 'base-de-conhecimento', label: 'Conhecimento', icon: BookOpen },
+    { id: 'gerenciar-conhecimento', label: 'Gerenciar Conhecimento', icon: FileCog }, // <-- ADICIONADO AQUI
     { id: 'configuracoes', label: 'Configurações', icon: Settings }
   ];
 
@@ -36,7 +37,8 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     { id: 'meus-treinamentos', label: 'Meus Treinamentos', icon: GraduationCap },
     { id: 'minhas-trilhas', label: 'Minhas Trilhas', icon: GitMerge },
     { id: 'progresso', label: 'Meu Progresso', icon: BarChart3 },
-    { id: 'ranking', label: 'Ranking', icon: Trophy }
+    { id: 'ranking', label: 'Ranking', icon: Trophy },
+    { id: 'base-de-conhecimento', label: 'Conhecimento', icon: BookOpen }
   ];
 
   const menuItems = isAdmin() ? adminMenuItems : funcionarioMenuItems;
@@ -47,7 +49,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
       animate={{ x: 0 }}
       className="w-64 bg-slate-800/50 backdrop-blur-lg border-r border-slate-700 h-screen flex flex-col"
     >
-      {/* Header e User Info (sem alterações) */}
       <div className="p-6 border-b border-slate-700">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -71,8 +72,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
         </div>
       </div>
       
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -95,8 +95,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-4 border-t border-slate-700 mt-auto">
         <Button onClick={onLogout} variant="ghost" className="w-full justify-start text-slate-300 hover:text-white hover:bg-red-500/20">
           <LogOut className="w-5 h-5 mr-3" />
           Sair

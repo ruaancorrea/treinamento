@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Users, CheckCircle, Percent, PieChart, TrendingUp, Filter } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Users, CheckCircle, Percent, Filter } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getDatabase } from '@/data/mockData';
 
 const Reports = () => {
-    const [reportData, setReportData] = useState(null);
     const [trainings, setTrainings] = useState([]);
     const [users, setUsers] = useState([]);
     const [history, setHistory] = useState([]);
@@ -19,13 +18,12 @@ const Reports = () => {
         setHistory(db.historico);
     }, []);
 
-    useEffect(() => {
-        if (users.length > 0) {
-            generateReport();
+    const reportData = useMemo(() => {
+        // Só executa o cálculo se já tivermos os dados dos usuários.
+        if (users.length === 0) {
+            return null;
         }
-    }, [users, history, trainings, selectedTraining]);
 
-    const generateReport = () => {
         const targetTrainings = selectedTraining === 'all'
             ? trainings
             : trainings.filter(t => t.id === parseInt(selectedTraining));
@@ -57,13 +55,14 @@ const Reports = () => {
             };
         }).sort((a, b) => b.completions - a.completions);
         
-        setReportData({
+        return {
             totalCompletions,
             completionRate,
             userProgress,
             trainingStats
-        });
-    };
+        };
+    // As dependências do useMemo: o cálculo só será refeito se um desses valores mudar.
+    }, [users, history, trainings, selectedTraining]);
     
     if (!reportData) {
         return <div className="text-center text-slate-400">Gerando relatórios...</div>;

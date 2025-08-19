@@ -17,6 +17,8 @@ import LearningPathList from '@/components/Employee/LearningPathList';
 import Progress from '@/components/Employee/Progress';
 import Ranking from '@/components/Employee/Ranking';
 import { initializeDatabase } from '@/data/mockData';
+import KnowledgeBase from '@/components/Shared/KnowledgeBase';
+import KnowledgeBaseManagement from '@/components/Admin/KnowledgeBaseManagement'; // <-- 1. IMPORTAR
 
 const MainApp = () => {
   const { user, logout, isAdmin, loading } = useAuth();
@@ -43,6 +45,7 @@ const MainApp = () => {
       case 'categorias': return <CategoryManagement />;
       case 'departamentos': return <DepartmentManagement />;
       case 'relatorios': return <Reports />;
+      case 'gerenciar-conhecimento': return <KnowledgeBaseManagement />; // <-- 2. ADICIONAR ROTA
       case 'configuracoes': return <Settings />;
       
       // Employee
@@ -50,6 +53,9 @@ const MainApp = () => {
       case 'minhas-trilhas': return <LearningPathList />;
       case 'progresso': return <Progress />;
       case 'ranking': return <Ranking />;
+
+      // Shared
+      case 'base-de-conhecimento': return <KnowledgeBase />;
       
       default: return isAdmin() ? <Dashboard setActiveTab={setActiveTab} /> : <TrainingList />;
     }
@@ -92,7 +98,6 @@ function App() {
     loadDb();
   }, []);
 
-  // Mostra um loading enquanto o banco de dados carrega
   if (!dbLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
