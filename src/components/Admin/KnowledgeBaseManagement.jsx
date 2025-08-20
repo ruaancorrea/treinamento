@@ -1,15 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { PlusCircle, Edit, Trash2, FileText, Link as LinkIcon, GraduationCap } from 'lucide-react';
-import { getDatabase, updateDatabase } from '@/data/mockData';
+import { PlusCircle, Edit, Trash2, FileText, Link as LinkIcon, GraduationCap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useToast } from "@/components/ui/use-toast";
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
+// --- MUDANÇA PRINCIPAL ---
+import { addData, updateData, deleteData } from '@/lib/firebaseService';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/firebaseConfig';
+
+// Função auxiliar para buscar todos os documentos de uma coleção
+const getAllData = async (collectionName) => {
+    try {
+        const querySnapshot = await getDocs(collection(db, collectionName));
+        const data = [];
+        querySnapshot.forEach((doc) => {
+            data.push({ id: doc.id, ...doc.data() });
+        });
+        return data;
+    } catch (error) {
+        console.error(`Erro ao buscar dados de ${collectionName}:`, error);
+        return [];
+    }
+};
 
 const KnowledgeBaseManagement = () => {
     const { user } = useAuth();
@@ -17,14 +35,22 @@ const KnowledgeBaseManagement = () => {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentArticle, setCurrentArticle] = useState(null);
     const [articleType, setArticleType] = useState('artigo');
+    const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
-    useEffect(() => {
-        const db = getDatabase();
+    const loadData = async () => {
+        setIsLoading(true);
+        const articlesData = await getAllData('knowledgeBase');
+        const trainingsData = await getAllData('treinamentos');
         setDbData({
-            articles: db.knowledgeBase || [],
-            trainings: db.treinamentos || []
+            articles: articlesData.sort((a, b) => new Date(b.dataCriacao) - new Date(a.dataCriacao)),
+            trainings: trainingsData
         });
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
+        loadData();
     }, []);
 
     const openDialog = (article = null) => {
@@ -33,18 +59,18 @@ const KnowledgeBaseManagement = () => {
         setIsDialogOpen(true);
     };
 
+    // --- FUNÇÃO REFATORADA ---
     const handleSaveArticle = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         const articleData = {
-            id: currentArticle?.id || new Date().getTime(),
             type: articleType,
             titulo: formData.get('titulo'),
             categoria: formData.get('categoria'),
             conteudo: formData.get('conteudo'),
-            tags: formData.get('tags')?.split(',').map(tag => tag.trim()) || [],
+            tags: formData.get('tags')?.split(',').map(tag => tag.trim()).filter(tag => tag) || [],
             autorNome: user.nome,
-            dataCriacao: new Date().toISOString(),
+            dataCriacao: currentArticle?.dataCriacao || new Date().toISOString(),
         };
 
         if (articleType === 'link_externo') {
@@ -53,23 +79,34 @@ const KnowledgeBaseManagement = () => {
             articleData.treinamentoId = parseInt(formData.get('treinamentoId'));
         }
 
-        const db = getDatabase();
-        const updatedArticles = currentArticle
-            ? db.knowledgeBase.map(a => a.id === articleData.id ? articleData : a)
-            : [...(db.knowledgeBase || []), articleData];
-
-        await updateDatabase({ ...db, knowledgeBase: updatedArticles });
-        setDbData(prev => ({ ...prev, articles: updatedArticles }));
-        toast({ title: "Sucesso!", description: "Postagem salva." });
+        if (currentArticle) {
+            await updateData('knowledgeBase', currentArticle.id, articleData);
+            toast({ title: "Sucesso!", description: "Postagem atualizada." });
+        } else {
+            await addData('knowledgeBase', articleData);
+            toast({ title: "Sucesso!", description: "Postagem criada." });
+        }
+        
+        await loadData();
         setIsDialogOpen(false);
     };
     
-    // ... (handleDeleteArticle permanece o mesmo)
+    // --- FUNÇÃO REFATORADA ---
+    const handleDeleteArticle = async (articleId) => {
+        if (!window.confirm("Tem certeza que deseja excluir esta postagem?")) return;
+        await deleteData('knowledgeBase', articleId);
+        await loadData();
+        toast({ title: "Sucesso!", description: "Postagem excluída." });
+    };
 
     const getTypeIcon = (type) => {
         if (type === 'link_externo') return <LinkIcon className="h-4 w-4 text-purple-400" />;
         if (type === 'link_treinamento') return <GraduationCap className="h-4 w-4 text-blue-400" />;
         return <FileText className="h-4 w-4 text-green-400" />;
+    }
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-full"><Loader2 className="h-10 w-10 animate-spin text-blue-500" /></div>;
     }
 
     return (
@@ -119,16 +156,16 @@ const KnowledgeBaseManagement = () => {
 
             <div className="bg-slate-800/50 border border-slate-700 rounded-lg">
                 {dbData.articles.map(article => (
-                    <div key={article.id} className="grid grid-cols-5 items-center p-4 border-b border-slate-700/50">
+                    <div key={article.id} className="grid grid-cols-5 items-center p-4 border-b border-slate-700/50 last:border-b-0">
                         <div className="col-span-2 flex items-center gap-2">
                             {getTypeIcon(article.type)}
-                            <span className="text-white font-medium">{article.titulo}</span>
+                            <span className="text-white font-medium truncate pr-2">{article.titulo}</span>
                         </div>
-                        <div className="text-slate-400">{article.categoria}</div>
+                        <div className="text-slate-400 truncate pr-2">{article.categoria}</div>
                         <div className="text-slate-500 text-xs">{new Date(article.dataCriacao).toLocaleDateString()}</div>
                         <div className="flex justify-end gap-2">
                              <Button variant="ghost" size="icon" onClick={() => openDialog(article)}><Edit className="h-4 w-4" /></Button>
-                             {/* ...botão de deletar... */}
+                             <Button variant="ghost" size="icon" onClick={() => handleDeleteArticle(article.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                         </div>
                     </div>
                 ))}

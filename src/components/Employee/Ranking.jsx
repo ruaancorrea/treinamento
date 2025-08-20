@@ -1,25 +1,55 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Award, Medal, Star } from 'lucide-react';
+import { Trophy, Award, Medal, Star, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDatabase } from '@/data/mockData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// --- MUDANÇA PRINCIPAL ---
+// Importamos uma nova função para buscar todos os dados de uma coleção
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/firebaseConfig';
+
+
+// Função auxiliar para buscar todos os documentos de uma coleção
+const getAllData = async (collectionName) => {
+    try {
+        const querySnapshot = await getDocs(collection(db, collectionName));
+        const data = [];
+        querySnapshot.forEach((doc) => {
+            data.push({ id: doc.id, ...doc.data() });
+        });
+        return data;
+    } catch (error) {
+        console.error(`Erro ao buscar dados de ${collectionName}:`, error);
+        return [];
+    }
+};
+
 
 const Ranking = () => {
     const { user } = useAuth();
     const [dbData, setDbData] = useState({ usuarios: [], historico: [], departamentos: [] });
+    const [isLoading, setIsLoading] = useState(true);
     
     const [selectedDepartment, setSelectedDepartment] = useState('all');
     const [selectedPeriod, setSelectedPeriod] = useState('all');
 
     useEffect(() => {
-        const db = getDatabase();
-        setDbData({
-            usuarios: db.usuarios || [],
-            historico: db.historico || [],
-            departamentos: db.departamentos || []
-        });
+        const loadAllData = async () => {
+            setIsLoading(true);
+            const usuariosData = await getAllData('usuarios');
+            const historicoData = await getAllData('historico');
+            const departamentosData = await getAllData('departamentos');
+            
+            setDbData({
+                usuarios: usuariosData,
+                historico: historicoData,
+                departamentos: departamentosData
+            });
+            setIsLoading(false);
+        };
+
+        loadAllData();
     }, []);
 
     const rankedUsers = useMemo(() => {
@@ -45,11 +75,10 @@ const Ranking = () => {
             usersToRank = usersToRank.filter(u => u.departamento === selectedDepartment);
         }
 
-        // 3. Calcula os pontos para os usuários filtrados
+        // 3. Calcula os pontos para os usuários filtrados (sua lógica original)
         const userScores = usersToRank.map(u => {
             const userHistory = historyFilteredByPeriod.filter(h => h.usuarioId === u.id);
             
-            // Sua lógica de pontuação original
             const bestScoresByTraining = userHistory.reduce((acc, h) => {
                 const existing = acc[h.treinamentoId];
                 if (!existing || h.notaQuestionario > existing.notaQuestionario) {
@@ -72,7 +101,7 @@ const Ranking = () => {
         });
 
         return userScores
-            .filter(u => u.completedCount > 0) // Mostra apenas quem pontuou
+            .filter(u => u.completedCount > 0)
             .sort((a, b) => b.finalScore - a.finalScore);
 
     }, [dbData, selectedDepartment, selectedPeriod]);
@@ -96,6 +125,14 @@ const Ranking = () => {
         return 'border-slate-700';
     };
 
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -103,7 +140,6 @@ const Ranking = () => {
                 <p className="text-slate-400">Veja quem está se destacando nos treinamentos.</p>
             </motion.div>
             
-            {/* Filtros e Posição do Usuário */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
                 <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                     <SelectTrigger className="bg-slate-800/50 border-slate-600">

@@ -1,25 +1,52 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, CheckCircle, Percent, Filter } from 'lucide-react';
+import { Users, CheckCircle, Percent, Filter, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getDatabase } from '@/data/mockData';
+// --- MUDANÇA PRINCIPAL ---
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/firebaseConfig';
+
+// Função auxiliar para buscar todos os documentos de uma coleção
+const getAllData = async (collectionName) => {
+    try {
+        const querySnapshot = await getDocs(collection(db, collectionName));
+        const data = [];
+        querySnapshot.forEach((doc) => {
+            data.push({ id: doc.id, ...doc.data() });
+        });
+        return data;
+    } catch (error) {
+        console.error(`Erro ao buscar dados de ${collectionName}:`, error);
+        return [];
+    }
+};
 
 const Reports = () => {
-    const [trainings, setTrainings] = useState([]);
-    const [users, setUsers] = useState([]);
-    const [history, setHistory] = useState([]);
+    const [dbData, setDbData] = useState({ trainings: [], users: [], history: [] });
+    const [isLoading, setIsLoading] = useState(true);
     const [selectedTraining, setSelectedTraining] = useState('all');
 
     useEffect(() => {
-        const db = getDatabase();
-        setTrainings(db.treinamentos);
-        setUsers(db.usuarios.filter(u => u.tipo === 'funcionario'));
-        setHistory(db.historico);
+        const loadAllData = async () => {
+            setIsLoading(true);
+            const trainingsData = await getAllData('treinamentos');
+            const usersData = await getAllData('usuarios');
+            const historyData = await getAllData('historico');
+            
+            setDbData({
+                trainings: trainingsData,
+                users: usersData.filter(u => u.tipo === 'funcionario'),
+                history: historyData
+            });
+            setIsLoading(false);
+        };
+
+        loadAllData();
     }, []);
 
     const reportData = useMemo(() => {
-        // Só executa o cálculo se já tivermos os dados dos usuários.
+        const { trainings, users, history } = dbData;
         if (users.length === 0) {
             return null;
         }
@@ -59,13 +86,21 @@ const Reports = () => {
             totalCompletions,
             completionRate,
             userProgress,
-            trainingStats
+            trainingStats,
+            totalUsers: users.length
         };
-    // As dependências do useMemo: o cálculo só será refeito se um desses valores mudar.
-    }, [users, history, trainings, selectedTraining]);
+    }, [dbData, selectedTraining]);
     
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
     if (!reportData) {
-        return <div className="text-center text-slate-400">Gerando relatórios...</div>;
+        return <div className="text-center text-slate-400">Não há dados suficientes para gerar relatórios.</div>;
     }
 
     return (
@@ -84,7 +119,7 @@ const Reports = () => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">Todos os Treinamentos</SelectItem>
-                                {trainings.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.titulo}</SelectItem>)}
+                                {dbData.trainings.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.titulo}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
@@ -116,7 +151,7 @@ const Reports = () => {
                             <CardTitle className="text-sm font-medium text-slate-200">Total de Funcionários</CardTitle>
                             <Users className="h-5 w-5 text-purple-500" />
                         </CardHeader>
-                        <CardContent><div className="text-2xl font-bold text-white">{users.length}</div></CardContent>
+                        <CardContent><div className="text-2xl font-bold text-white">{reportData.totalUsers}</div></CardContent>
                     </Card>
                 </motion.div>
             </div>

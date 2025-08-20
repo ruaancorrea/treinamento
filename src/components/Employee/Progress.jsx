@@ -1,26 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Award, BookOpen, Clock, CheckCircle, TrendingUp } from 'lucide-react';
+import { Award, BookOpen, Clock, CheckCircle, TrendingUp, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDatabase } from '@/data/mockData';
+// --- MUDANÇA PRINCIPAL ---
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/firebaseConfig';
+
+// Função auxiliar para buscar todos os documentos de uma coleção
+const getAllData = async (collectionName) => {
+    try {
+        const querySnapshot = await getDocs(collection(db, collectionName));
+        const data = [];
+        querySnapshot.forEach((doc) => {
+            data.push({ id: doc.id, ...doc.data() });
+        });
+        return data;
+    } catch (error) {
+        console.error(`Erro ao buscar dados de ${collectionName}:`, error);
+        return [];
+    }
+};
 
 const Progress = () => {
     const { user } = useAuth();
     const [progressData, setProgressData] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (user) {
-            const db = getDatabase();
-            if(!db) return;
+        const loadProgressData = async () => {
+            if (!user) return;
             
-            // Trainings available to the user
-            const availableTrainings = db.treinamentos.filter(t => 
+            setIsLoading(true);
+
+            // Busca todos os treinamentos
+            const treinamentosData = await getAllData('treinamentos');
+            
+            // Busca o histórico APENAS do usuário logado
+            const historicoQuery = query(collection(db, 'historico'), where('usuarioId', '==', user.id));
+            const historicoSnapshot = await getDocs(historicoQuery);
+            const userHistory = [];
+            historicoSnapshot.forEach(doc => userHistory.push({ id: doc.id, ...doc.data() }));
+
+            // Sua lógica de cálculo original, agora com os dados do Firestore
+            const availableTrainings = treinamentosData.filter(t => 
                 t.ativo && (t.departamento === 'Todos' || t.departamento === user.departamento)
             );
 
-            // User's history
-            const userHistory = db.historico.filter(h => h.usuarioId === user.id);
             const completedHistory = userHistory.filter(h => h.concluido);
             
             const completedCount = completedHistory.length;
@@ -34,7 +60,7 @@ const Progress = () => {
                 .sort((a, b) => new Date(b.dataConclusao) - new Date(a.dataConclusao))
                 .slice(0, 5)
                 .map(h => {
-                    const training = db.treinamentos.find(t => t.id === h.treinamentoId);
+                    const training = treinamentosData.find(t => t.id === h.treinamentoId);
                     return { ...h, trainingTitle: training?.titulo || 'Treinamento desconhecido' };
                 });
 
@@ -42,15 +68,27 @@ const Progress = () => {
                 totalTrainings: availableTrainings.length,
                 completedCount,
                 completionRate,
-                totalTime, // in seconds
+                totalTime,
                 avgScore,
                 recentCompletions,
             });
-        }
+
+            setIsLoading(false);
+        };
+
+        loadProgressData();
     }, [user]);
 
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+            </div>
+        );
+    }
+
     if (!progressData) {
-        return <div className="text-center text-slate-400">A carregar o seu progresso...</div>;
+        return <div className="text-center text-slate-400">Não foi possível carregar seu progresso.</div>;
     }
 
     const statCards = [
@@ -75,7 +113,7 @@ const Progress = () => {
                             <Card className="glass-effect border-slate-700 card-hover">
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                                     <CardTitle className="text-sm font-medium text-slate-200">{stat.title}</CardTitle>
-                                    <div className={`p-2 rounded-lg bg-gradient-to-r from-${stat.color}-500 to-${stat.color}-600`}>
+                                    <div className={`p-2 rounded-lg bg-${stat.color}-500`}>
                                         <Icon className="h-4 w-4 text-white" />
                                     </div>
                                 </CardHeader>
@@ -99,14 +137,12 @@ const Progress = () => {
                         {progressData.recentCompletions.length > 0 ? (
                             <ul className="space-y-3">
                                 {progressData.recentCompletions.map((item, index) => (
-                                    // --- CORREÇÃO AQUI ---
-                                    // Adicionada a propriedade key para dar uma identidade única a cada item da lista
                                     <motion.li 
-                                      key={`${item.id}-${index}`} // Usar uma combinação para garantir unicidade em caso de repetições
-                                      initial={{ opacity: 0, x: -10 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{ delay: 0.1 * index }}
-                                      className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"
+                                        key={`${item.id}-${index}`}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.1 * index }}
+                                        className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
