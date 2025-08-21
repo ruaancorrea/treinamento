@@ -15,9 +15,7 @@ import {
 
 const PAGE_SIZE = 15;
 
-/**
- * Busca todos os documentos de uma coleção.
- */
+// --- As funções getAllData e getPaginatedData não mudam ---
 export const getAllData = async (collectionName) => {
     try {
         const querySnapshot = await getDocs(collection(db, collectionName));
@@ -32,32 +30,7 @@ export const getAllData = async (collectionName) => {
     }
 };
 
-/**
- * Busca TODOS os treinamentos disponíveis para um utilizador.
- */
-export const getTrainingsForUser = async (userDepartment) => {
-    try {
-        const trainingsRef = collection(db, 'treinamentos');
-        const deptQuery = query(trainingsRef, where('ativo', '==', true), where('departamento', '==', userDepartment));
-        const allDeptsQuery = query(trainingsRef, where('ativo', '==', true), where('departamento', '==', 'Todos'));
-        const [deptSnapshot, allDeptsSnapshot] = await Promise.all([getDocs(deptQuery), getDocs(allDeptsQuery)]);
-        const trainingsMap = new Map();
-        deptSnapshot.forEach((doc) => trainingsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        allDeptsSnapshot.forEach((doc) => trainingsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        return Array.from(trainingsMap.values());
-    } catch (error) {
-        console.error(`Erro ao buscar treinamentos para o utilizador:`, error);
-        return [];
-    }
-};
-
-/**
- * Busca documentos de uma coleção com paginação e ordenação customizada.
- */
 export const getPaginatedData = async (collectionName, options) => {
-    // --- CORREÇÃO AQUI ---
-    // Garante que 'options' seja sempre um objeto, mesmo que nada seja passado.
-    // Isto evita o erro 'Cannot read properties of null'.
     const safeOptions = options || {};
     const { lastVisible = null, orderByField = "dataCriacao", orderDirection = "desc" } = safeOptions;
     
@@ -69,6 +42,7 @@ export const getPaginatedData = async (collectionName, options) => {
         );
         const q = lastVisible ? query(baseQuery, startAfter(lastVisible)) : baseQuery;
         const querySnapshot = await getDocs(q);
+        
         const data = [];
         querySnapshot.forEach((doc) => {
             data.push({ id: doc.id, ...doc.data() });
@@ -85,9 +59,52 @@ export const getPaginatedData = async (collectionName, options) => {
     }
 };
 
+
 /**
- * Adiciona um novo documento a uma coleção.
+ * (VERSÃO PLANO C - SEM ÍNDICES)
+ * Esta função lê todos os treinamentos ativos e filtra no código.
+ * É menos eficiente e mais custosa, mas não requer índices.
+ * A paginação é simulada no lado do cliente.
  */
+export const getPaginatedTrainingsForUser = async (userDepartment, options = {}) => {
+    console.warn("Atenção: Usando modo de busca de treinamentos não otimizado (Plano C).");
+    const { page = 1 } = options; 
+    
+    try {
+        const trainingsRef = collection(db, 'treinamentos');
+        
+        // 1. Busca TODOS os treinamentos que estão ativos.
+        const q = query(trainingsRef, where('ativo', '==', true));
+        const querySnapshot = await getDocs(q);
+
+        const allActiveTrainings = [];
+        querySnapshot.forEach(doc => {
+            allActiveTrainings.push({ id: doc.id, ...doc.data() });
+        });
+
+        // 2. Filtra no código para o departamento do usuário + "Todos".
+        const userVisibleTrainings = allActiveTrainings.filter(
+            training => training.departamento === userDepartment || training.departamento === 'Todos'
+        );
+
+        // 3. Ordena por data no código.
+        userVisibleTrainings.sort((a, b) => new Date(b.dataPublicacao) - new Date(a.dataPublicacao));
+        
+        // 4. Simula a paginação. Esta lógica foi removida para simplificar,
+        //    pois carregar tudo de uma vez é a premissa deste plano.
+        //    Vamos retornar tudo e a lógica de "Carregar Mais" será desativada.
+        
+        return { data: userVisibleTrainings, lastVisible: null }; // Retorna null para desativar o "Carregar mais".
+
+    } catch (error) {
+        // Este erro não deverá ser de índice.
+        console.error(`Erro ao buscar treinamentos (Plano C):`, error);
+        return { data: [], lastVisible: null };
+    }
+};
+
+
+// --- Funções de Escrita (ADD, UPDATE, DELETE) - Sem alterações ---
 export const addData = async (collectionName, data) => {
     try {
         const docRef = await addDoc(collection(db, collectionName), data);
@@ -98,9 +115,6 @@ export const addData = async (collectionName, data) => {
     }
 };
 
-/**
- * Atualiza um documento existente em uma coleção.
- */
 export const updateData = async (collectionName, docId, data) => {
     try {
         const docRef = doc(db, collectionName, docId);
@@ -110,9 +124,6 @@ export const updateData = async (collectionName, docId, data) => {
     }
 };
 
-/**
- * Deleta um documento de uma coleção.
- */
 export const deleteData = async (collectionName, docId) => {
     try {
         await deleteDoc(doc(db, collectionName, docId));

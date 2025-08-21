@@ -10,47 +10,55 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 // --- MUDANÇA PRINCIPAL ---
-import { addData, updateData, deleteData } from '@/lib/firebaseService';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/firebaseConfig';
-
-// Função auxiliar para buscar todos os documentos de uma coleção
-const getAllData = async (collectionName) => {
-    try {
-        const querySnapshot = await getDocs(collection(db, collectionName));
-        const data = [];
-        querySnapshot.forEach((doc) => {
-            data.push({ id: doc.id, ...doc.data() });
-        });
-        return data;
-    } catch (error) {
-        console.error(`Erro ao buscar dados de ${collectionName}:`, error);
-        return [];
-    }
-};
+import { addData, updateData, deleteData, getPaginatedData, getAllData } from '@/lib/firebaseService';
 
 const KnowledgeBaseManagement = () => {
     const { user } = useAuth();
-    const [dbData, setDbData] = useState({ articles: [], trainings: [] });
+    const [articles, setArticles] = useState([]);
+    const [trainings, setTrainings] = useState([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentArticle, setCurrentArticle] = useState(null);
     const [articleType, setArticleType] = useState('artigo');
-    const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
-    const loadData = async () => {
+    // --- NOVOS ESTADOS PARA PAGINAÇÃO ---
+    const [lastVisible, setLastVisible] = useState(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    const loadArticles = async (isLoadMore = false) => {
+        if (isLoading || (!isLoadMore && !isInitialLoad)) return;
         setIsLoading(true);
-        const articlesData = await getAllData('knowledgeBase');
-        const trainingsData = await getAllData('treinamentos');
-        setDbData({
-            articles: articlesData.sort((a, b) => new Date(b.dataCriacao) - new Date(a.dataCriacao)),
-            trainings: trainingsData
+
+        const result = await getPaginatedData('knowledgeBase', {
+            lastVisible: isLoadMore ? lastVisible : null,
+            orderByField: 'dataCriacao',
+            orderDirection: 'desc'
         });
+
+        if (result.data.length > 0) {
+            setArticles(prev => isLoadMore ? [...prev, ...result.data] : result.data);
+            setLastVisible(result.lastVisible);
+        }
+
+        if (!result.lastVisible || result.data.length < 15) { // PAGE_SIZE
+            setHasMore(false);
+        }
         setIsLoading(false);
+        if (isInitialLoad) setIsInitialLoad(false);
+    };
+
+    const loadInitialData = async () => {
+        setIsInitialLoad(true);
+        const trainingsData = await getAllData('treinamentos'); // Treinamentos não precisam de paginação aqui
+        setTrainings(trainingsData);
+        await loadArticles();
+        setIsInitialLoad(false);
     };
 
     useEffect(() => {
-        loadData();
+        loadInitialData();
     }, []);
 
     const openDialog = (article = null) => {
@@ -59,7 +67,6 @@ const KnowledgeBaseManagement = () => {
         setIsDialogOpen(true);
     };
 
-    // --- FUNÇÃO REFATORADA ---
     const handleSaveArticle = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -76,7 +83,7 @@ const KnowledgeBaseManagement = () => {
         if (articleType === 'link_externo') {
             articleData.url = formData.get('url');
         } else if (articleType === 'link_treinamento') {
-            articleData.treinamentoId = parseInt(formData.get('treinamentoId'));
+            articleData.treinamentoId = formData.get('treinamentoId');
         }
 
         if (currentArticle) {
@@ -86,17 +93,16 @@ const KnowledgeBaseManagement = () => {
             await addData('knowledgeBase', articleData);
             toast({ title: "Sucesso!", description: "Postagem criada." });
         }
-        
-        await loadData();
+
         setIsDialogOpen(false);
+        await loadArticles(); // Recarrega a primeira página
     };
-    
-    // --- FUNÇÃO REFATORADA ---
+
     const handleDeleteArticle = async (articleId) => {
         if (!window.confirm("Tem certeza que deseja excluir esta postagem?")) return;
         await deleteData('knowledgeBase', articleId);
-        await loadData();
         toast({ title: "Sucesso!", description: "Postagem excluída." });
+        setArticles(prev => prev.filter(a => a.id !== articleId)); // Remove do estado local
     };
 
     const getTypeIcon = (type) => {
@@ -105,7 +111,7 @@ const KnowledgeBaseManagement = () => {
         return <FileText className="h-4 w-4 text-green-400" />;
     }
 
-    if (isLoading) {
+    if (isInitialLoad) {
         return <div className="flex justify-center items-center h-full"><Loader2 className="h-10 w-10 animate-spin text-blue-500" /></div>;
     }
 
@@ -131,18 +137,18 @@ const KnowledgeBaseManagement = () => {
                                 <SelectItem value="link_treinamento">Atalho para Treinamento</SelectItem>
                             </SelectContent>
                         </Select>
-                        
+
                         <Input name="titulo" placeholder="Título da postagem" defaultValue={currentArticle?.titulo} required />
                         <Input name="categoria" placeholder="Categoria (Ex: Fiscal, Legislação)" defaultValue={currentArticle?.categoria} required />
-                        
+
                         {articleType === 'link_externo' && <Input name="url" placeholder="URL do link externo" defaultValue={currentArticle?.url} required />}
                         {articleType === 'link_treinamento' && (
                             <Select name="treinamentoId" defaultValue={currentArticle?.treinamentoId?.toString()}>
                                 <SelectTrigger><SelectValue placeholder="Selecione um treinamento" /></SelectTrigger>
-                                <SelectContent>{dbData.trainings.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.titulo}</SelectItem>)}</SelectContent>
+                                <SelectContent>{trainings.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.titulo}</SelectItem>)}</SelectContent>
                             </Select>
                         )}
-                        
+
                         <Textarea name="conteudo" placeholder="Descrição ou conteúdo do artigo..." defaultValue={currentArticle?.conteudo} required />
                         <Input name="tags" placeholder="Tags separadas por vírgula (Ex: eSocial, prazo, guia)" defaultValue={currentArticle?.tags?.join(', ')} />
 
@@ -155,7 +161,7 @@ const KnowledgeBaseManagement = () => {
             </Dialog>
 
             <div className="bg-slate-800/50 border border-slate-700 rounded-lg">
-                {dbData.articles.map(article => (
+                {articles.map(article => (
                     <div key={article.id} className="grid grid-cols-5 items-center p-4 border-b border-slate-700/50 last:border-b-0">
                         <div className="col-span-2 flex items-center gap-2">
                             {getTypeIcon(article.type)}
@@ -170,6 +176,14 @@ const KnowledgeBaseManagement = () => {
                     </div>
                 ))}
             </div>
+
+            {hasMore && (
+                <div className="text-center mt-8">
+                    <Button onClick={() => loadArticles(true)} disabled={isLoading}>
+                        {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando...</> : 'Carregar Mais Artigos'}
+                    </Button>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,0 +1,36 @@
+20/08/2025 10:17:22 - INFO - ================ INICIANDO NOVA VERIFICAÇÃO ================
+20/08/2025 10:17:22 - INFO - Procurando caminho de origem ativo...
+20/08/2025 10:17:22 - INFO - Tentando acessar: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS'
+20/08/2025 10:17:22 - INFO - Sucesso! Usando origem: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS'
+20/08/2025 10:17:22 - INFO - --- Verificando pasta do departamento: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS\FOLHA' ---
+20/08/2025 10:17:22 - INFO - --- Verificando pasta do departamento: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS\CONTABIL' ---
+20/08/2025 10:17:22 - INFO - --- Verificando pasta do departamento: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS\PESSOAL' ---
+20/08/2025 10:17:22 - INFO - --- Verificando pasta do departamento: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS\FISCAL' ---
+20/08/2025 10:17:22 - INFO - --- Verificando pasta do departamento: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS\PATRIMONIO' ---
+20/08/2025 10:17:22 - INFO - Nenhum arquivo novo encontrado para processar.
+20/08/2025 10:17:22 - INFO - ================ VERIFICAÇÃO CONCLUÍDA ================
+
+20/08/2025 13:48:16 - INFO - ================ INICIANDO CICLO DE VERIFICAÇÃO ================
+20/08/2025 13:48:16 - INFO - Procurando caminho de origem ativo...
+20/08/2025 13:48:16 - INFO - Sucesso! Usando origem: '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS'
+20/08/2025 13:48:16 - INFO - Processando arquivo: '886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:16 - INFO - Procurando pasta do cliente para o código '886'...
+20/08/2025 13:48:23 - INFO - PASTA DO CLIENTE ENCONTRADA: 'I:\Drives compartilhados\A - CLIENTES PJ (N-Z)\AUTO POSTO GUIMARAES ROSA LTDA - 886'
+20/08/2025 13:48:23 - INFO - Copiando '886-AnalíticodeGPS-012025.pdf' para 'I:\Drives compartilhados\A - CLIENTES PJ (N-Z)\AUTO POSTO GUIMARAES ROSA LTDA - 886\3 CONTABIL\2025\3 ROTINAS AUTOMATICAS\FOLHA'
+20/08/2025 13:48:24 - INFO - SUCESSO! Arquivo copiado para 'I:\Drives compartilhados\A - CLIENTES PJ (N-Z)\AUTO POSTO GUIMARAES ROSA LTDA - 886\3 CONTABIL\2025\3 ROTINAS AUTOMATICAS\FOLHA\886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:24 - INFO - Processando arquivo: '886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:24 - INFO - Procurando pasta do cliente para o código '886'...
+20/08/2025 13:48:30 - INFO - PASTA DO CLIENTE ENCONTRADA: 'I:\Drives compartilhados\A - CLIENTES PJ (N-Z)\AUTO POSTO GUIMARAES ROSA LTDA - 886'
+20/08/2025 13:48:30 - INFO - Copiando '886-AnalíticodeGPS-012025.pdf' para 'I:\Drives compartilhados\A - CLIENTES PJ (N-Z)\AUTO POSTO GUIMARAES ROSA LTDA - 886\3 CONTABIL\2025\3 ROTINAS AUTOMATICAS\CONTABIL'
+20/08/2025 13:48:31 - INFO - SUCESSO! Arquivo copiado para 'I:\Drives compartilhados\A - CLIENTES PJ (N-Z)\AUTO POSTO GUIMARAES ROSA LTDA - 886\3 CONTABIL\2025\3 ROTINAS AUTOMATICAS\CONTABIL\886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:31 - INFO - --- FASE DE ARQUIVAMENTO EM ZIP ---
+20/08/2025 13:48:31 - INFO - Criando arquivo ZIP para competência '012025' em '\\192.168.10.17\e\backup\ROTINAS_AUTOMATICAS\Processados_ZIP\012025.zip'
+20/08/2025 13:48:31 - INFO - Adicionado ao ZIP: '886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:32 - INFO - Adicionado ao ZIP: '886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:32 - INFO - ZIP '012025.zip' criado com sucesso. Removendo arquivos originais...
+20/08/2025 13:48:32 - INFO - Removido: '886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:33 - INFO - Removido: '886-AnalíticodeGPS-012025.pdf'
+20/08/2025 13:48:33 - INFO - ================ CICLO DE VERIFICAÇÃO CONCLUÍDO ================
+
+20/08/2025 13:48:33 - INFO - Próxima execução agendada para: 21/08/2025 04:00:00
+20/08/2025 14:03:12 - INFO - Verificação manual acionada pelo utilizador!

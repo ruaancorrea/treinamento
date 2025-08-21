@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { getTrainingsForUser, getAllData } from '@/lib/firebaseService'; // <-- USA A NOVA FUNÇÃO
+import { getPaginatedTrainingsForUser, getAllData } from '@/lib/firebaseService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebaseConfig';
 import TrainingCard from '@/components/Employee/TrainingCard';
@@ -21,49 +21,74 @@ const TrainingList = () => {
     const [selectedTraining, setSelectedTraining] = useState(null);
     const { user } = useAuth();
 
-    // Estado de loading simplificado
-    const [isLoading, setIsLoading] = useState(true);
+    // --- ESTADOS DE PAGINAÇÃO SIMPLIFICADOS (PLANO B) ---
+    const [lastVisible, setLastVisible] = useState(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    const loadAllData = async () => {
-        if (!user) return;
+    const fetchTrainings = async (isLoadMore = false) => {
+        if (isLoading || !user) return;
         setIsLoading(true);
 
+        const result = await getPaginatedTrainingsForUser(user.departamento, {
+            lastVisible: isLoadMore ? lastVisible : null
+        });
+
+        if (result.data.length > 0) {
+            // Garante que não haja duplicatas ao carregar mais
+            const existingIds = new Set(allTrainings.map(t => t.id));
+            const newTrainings = result.data.filter(t => !existingIds.has(t.id));
+            setAllTrainings(prev => isLoadMore ? [...prev, ...newTrainings] : result.data);
+            setLastVisible(result.lastVisible);
+        }
+
+        if (!result.lastVisible || result.data.length < 15) { // PAGE_SIZE
+            setHasMore(false);
+        }
+        
+        setIsLoading(false);
+    };
+    
+    const loadInitialData = async () => {
+        if (!user) return;
+        setIsInitialLoad(true);
         try {
-            // Busca todos os dados necessários em paralelo para mais performance
-            const [trainingsData, categoriesData, historicoSnapshot] = await Promise.all([
-                getTrainingsForUser(user.departamento),
+            const [categoriesData, historicoSnapshot] = await Promise.all([
                 getAllData('categorias'),
                 getDocs(query(collection(db, 'historico'), where('usuarioId', '==', user.id)))
             ]);
 
-            setAllTrainings(trainingsData);
             setCategories(categoriesData);
 
             const progress = {};
             historicoSnapshot.forEach(doc => {
                 const data = doc.data();
-                // O ID do treinamento é um número no seu mock, mas pode ser string no Firestore.
-                // Garantimos que a chave do objeto seja consistente.
-                const trainingId = data.treinamentoId.toString();
-                progress[trainingId] = { id: doc.id, ...data };
+                progress[data.treinamentoId.toString()] = { id: doc.id, ...data };
             });
             setUserProgress(progress);
 
+            await fetchTrainings(false);
+
         } catch (error) {
-            console.error("Erro ao carregar dados da lista de treinamentos:", error);
+            console.error("Erro ao carregar dados iniciais:", error);
         } finally {
-            setIsLoading(false);
+            setIsInitialLoad(false);
         }
     };
 
     useEffect(() => {
         if (user) {
-            loadAllData(); 
+            // Reseta o estado ao mudar de usuário para evitar dados misturados
+            setAllTrainings([]);
+            setLastVisible(null);
+            setHasMore(true);
+            loadInitialData();
         }
     }, [user]);
 
     useEffect(() => {
-        let filtered = allTrainings;
+        let filtered = [...allTrainings];
         
         if (searchTerm) {
             filtered = filtered.filter(training =>
@@ -81,13 +106,19 @@ const TrainingList = () => {
         setFilteredTrainings(filtered);
     }, [allTrainings, searchTerm, selectedCategory]);
     
-    const handleTrainingComplete = () => {
+    const handleTrainingComplete = async () => {
         setSelectedTraining(null);
-        // Recarrega todos os dados para garantir que o progresso seja atualizado
-        loadAllData();
+        // Apenas atualiza o progresso para evitar recarregar a lista toda
+        const historicoSnapshot = await getDocs(query(collection(db, 'historico'), where('usuarioId', '==', user.id)));
+        const progress = {};
+        historicoSnapshot.forEach(doc => {
+            const data = doc.data();
+            progress[data.treinamentoId.toString()] = { id: doc.id, ...data };
+        });
+        setUserProgress(prev => ({ ...prev, ...progress }));
     };
 
-    if (isLoading) {
+    if (isInitialLoad) {
         return (
             <div className="flex justify-center items-center h-full">
                 <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
@@ -111,7 +142,7 @@ const TrainingList = () => {
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                     <Input
-                        placeholder="Buscar nos treinamentos..."
+                        placeholder="Buscar nos treinamentos carregados..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 bg-slate-800/50 border-slate-600 text-white"
@@ -139,7 +170,7 @@ const TrainingList = () => {
                     <TrainingCard
                         key={training.id}
                         training={training}
-                        userProgress={userProgress[training.id.toString()]} // Garante que a chave seja string
+                        userProgress={userProgress[training.id.toString()]}
                         categories={categories}
                         onStartTraining={() => setSelectedTraining(training)}
                         index={index}
@@ -158,7 +189,13 @@ const TrainingList = () => {
                 </motion.div>
             )}
 
-            {/* O botão "Carregar Mais" foi removido pois agora carregamos todos os treinamentos disponíveis de uma vez */}
+            {hasMore && (
+                <div className="text-center mt-8">
+                    <Button onClick={() => fetchTrainings(true)} disabled={isLoading}>
+                        {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando...</> : 'Carregar Mais Treinamentos'}
+                    </Button>
+                </div>
+            )}
 
             {selectedTraining && (
                 <TrainingDialog
