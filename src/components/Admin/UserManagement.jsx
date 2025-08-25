@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Edit, Trash2, UserCheck, UserX, Mail, Building, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, UserCheck, UserX, Mail, Building, Calendar, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,19 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-// --- MUDANÇA PRINCIPAL ---
-import { getPaginatedData, addData, updateData, deleteData } from '@/lib/firebaseService';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/firebaseConfig';
-
-// Função auxiliar para buscar todos os documentos de uma coleção (para departamentos)
-const getAllData = async (collectionName) => {
-    const querySnapshot = await getDocs(collection(db, collectionName));
-    const data = [];
-    querySnapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
-    return data;
-};
-
+import { getPaginatedData, addData, updateData, deleteData, getAllData, resetUserData } from '@/lib/firebaseService';
 
 const UserManagement = () => {
     const [allUsers, setAllUsers] = useState([]);
@@ -33,19 +21,13 @@ const UserManagement = () => {
     const [formData, setFormData] = useState({});
     const { toast } = useToast();
 
-    // --- NOVOS ESTADOS PARA PAGINAÇÃO ---
     const [lastVisible, setLastVisible] = useState(null);
     const [hasMore, setHasMore] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     const initialFormData = {
-        nome: '',
-        email: '',
-        senha: '',
-        tipo: 'funcionario',
-        departamento: '',
-        ativo: true
+        nome: '', email: '', senha: '', tipo: 'funcionario', departamento: '', ativo: true
     };
 
     const resetForm = (depts) => {
@@ -57,19 +39,14 @@ const UserManagement = () => {
     const fetchUsers = async (isLoadMore = false) => {
         if (isLoading) return;
         setIsLoading(true);
-
-        // A ordenação para usuários deve ser por 'nome'
-        // No firebaseService.js, a ordenação padrão é 'dataCriacao'. 
-        // Para uma ordenação diferente, precisaríamos de uma query específica ou ajustar o serviço.
-        // Por agora, manteremos a ordenação padrão do serviço.
-        const result = await getPaginatedData('usuarios', isLoadMore ? lastVisible : null);
+        const result = await getPaginatedData('usuarios', { lastVisible: isLoadMore ? lastVisible : null });
         
         if (result.data.length > 0) {
             setAllUsers(prev => isLoadMore ? [...prev, ...result.data] : result.data);
             setLastVisible(result.lastVisible);
         }
         
-        if (result.data.length < 15) { // PAGE_SIZE do firebaseService
+        if (result.data.length < 15) {
             setHasMore(false);
         }
         
@@ -81,7 +58,7 @@ const UserManagement = () => {
             setIsInitialLoad(true);
             const depts = await getAllData('departamentos');
             setDepartments(depts);
-            resetForm(depts); // Inicializa o formulário com os departamentos carregados
+            resetForm(depts);
             await fetchUsers();
             setIsInitialLoad(false);
         };
@@ -108,27 +85,20 @@ const UserManagement = () => {
             await updateData('usuarios', editingUser.id, dataToUpdate);
             toast({ title: "Usuário atualizado!" });
         } else {
-            const newUser = {
-                ...formData,
-                dataCriacao: new Date().toISOString()
-            };
+            const newUser = { ...formData, dataCriacao: new Date().toISOString() };
             await addData('usuarios', newUser);
             toast({ title: "Usuário criado!" });
         }
         
         setIsDialogOpen(false);
-        await fetchUsers(); // Recarrega a primeira página para mostrar as mudanças
+        await fetchUsers();
     };
 
     const handleEdit = (user) => {
         setEditingUser(user);
         setFormData({
-            nome: user.nome,
-            email: user.email,
-            senha: '',
-            tipo: user.tipo,
-            departamento: user.departamento,
-            ativo: user.ativo
+            nome: user.nome, email: user.email, senha: '',
+            tipo: user.tipo, departamento: user.departamento, ativo: user.ativo
         });
         setIsDialogOpen(true);
     };
@@ -137,16 +107,26 @@ const UserManagement = () => {
         if (!window.confirm("Tem certeza que deseja remover este usuário?")) return;
         await deleteData('usuarios', userId);
         toast({ title: "Usuário removido!" });
-        setAllUsers(prev => prev.filter(user => user.id !== userId)); // Remove do estado local
+        setAllUsers(prev => prev.filter(user => user.id !== userId));
     };
 
     const toggleUserStatus = async (user) => {
         const newStatus = !user.ativo;
         await updateData('usuarios', user.id, { ativo: newStatus });
         toast({ title: "Status atualizado!" });
-        setAllUsers(prevUsers => prevUsers.map(u => 
-            u.id === user.id ? { ...u, ativo: newStatus } : u
-        ));
+        setAllUsers(prevUsers => prevUsers.map(u => u.id === user.id ? { ...u, ativo: newStatus } : u));
+    };
+
+    // --- NOVA FUNÇÃO PARA ZERAR O DESEMPENHO ---
+    const handleReset = async (user) => {
+        if (!window.confirm(`Tem certeza que deseja ZERAR TODO O DESEMPENHO do usuário "${user.nome}"? Esta ação não pode ser desfeita.`)) return;
+        
+        try {
+            await resetUserData(user.id);
+            toast({ title: "Desempenho zerado!", description: `Todos os dados de progresso de ${user.nome} foram removidos.` });
+        } catch (error) {
+            toast({ title: "Erro", description: error.message, variant: "destructive" });
+        }
     };
 
     if (isInitialLoad) {
@@ -167,9 +147,7 @@ const UserManagement = () => {
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="glass-effect border-slate-700 text-white">
-                        <DialogHeader>
-                            <DialogTitle>{editingUser ? 'Editar' : 'Novo'} Usuário</DialogTitle>
-                        </DialogHeader>
+                        <DialogHeader><DialogTitle>{editingUser ? 'Editar' : 'Novo'} Usuário</DialogTitle></DialogHeader>
                         <form id="userForm" onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2"><Label htmlFor="nome">Nome</Label><Input id="nome" value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} className="bg-slate-800/50" required /></div>
@@ -184,9 +162,7 @@ const UserManagement = () => {
                                 <Select value={formData.departamento} onValueChange={(value) => setFormData({...formData, departamento: value})}>
                                     <SelectTrigger className="bg-slate-800/50"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                                     <SelectContent>
-                                        {departments.map(dept => (
-                                            <SelectItem key={dept.id} value={dept.nome}>{dept.nome}</SelectItem>
-                                        ))}
+                                        {departments.map(dept => (<SelectItem key={dept.id} value={dept.nome}>{dept.nome}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -229,6 +205,8 @@ const UserManagement = () => {
                                     <div className="flex space-x-2">
                                         <Button size="sm" variant="outline" onClick={() => handleEdit(user)} className="border-slate-600 hover:bg-slate-700"><Edit className="w-4 h-4" /></Button>
                                         <Button size="sm" variant="outline" onClick={() => toggleUserStatus(user)} className={`border-slate-600 ${user.ativo ? 'hover:bg-red-500/20 hover:border-red-500' : 'hover:bg-green-500/20 hover:border-green-500'}`}>{user.ativo ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}</Button>
+                                        {/* --- BOTÃO PARA ZERAR DESEMPENHO --- */}
+                                        <Button size="sm" variant="outline" onClick={() => handleReset(user)} className="border-slate-600 hover:bg-yellow-500/20 hover:border-yellow-500" title="Zerar Desempenho"><RotateCcw className="w-4 h-4" /></Button>
                                     </div>
                                     <Button size="sm" variant="outline" onClick={() => handleDelete(user.id)} className="border-slate-600 hover:bg-red-500/20 hover:border-red-500"><Trash2 className="w-4 h-4" /></Button>
                                 </div>

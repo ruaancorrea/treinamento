@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import React, { useState, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, Award, CheckCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-// --- MUDANÇA PRINCIPAL ---
 import { addData, updateData } from '@/lib/firebaseService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebaseConfig';
@@ -67,21 +66,26 @@ const QuizView = ({ training, onQuizComplete }) => {
 };
 
 
-const TrainingDialog = ({ training, isOpen, onClose, onComplete, initialProgress }) => {
+const TrainingDialog = ({ training, isOpen, onClose, onComplete }) => {
     const [showQuiz, setShowQuiz] = useState(false);
     const [videoCompleted, setVideoCompleted] = useState(false);
     const playerRef = useRef(null);
-    const progressIntervalRef = useRef(null);
     const { toast } = useToast();
     const { user } = useAuth();
 
-    useEffect(() => {
-        return () => {
-            clearInterval(progressIntervalRef.current);
-        };
-    }, []);
+    const getYouTubeVideoId = (url) => {
+        if (!url) return null;
+        try {
+            const urlObj = new URL(url);
+            if (urlObj.hostname === 'youtu.be') return urlObj.pathname.slice(1);
+            if (urlObj.hostname.includes('youtube.com')) return urlObj.searchParams.get('v');
+        } catch (error) { return null; }
+        return null;
+    };
+    
+    const videoId = getYouTubeVideoId(training?.video);
+    const isYouTube = !!videoId;
 
-    // --- FUNÇÃO REFATORADA ---
     const findOrCreateProgress = async () => {
         const q = query(
             collection(db, 'historico'),
@@ -93,82 +97,42 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete, initialProgress
             const doc = querySnapshot.docs[0];
             return { id: doc.id, ...doc.data() };
         }
-        return null; // Não existe, será criado
-    };
-
-    // --- FUNÇÃO REFATORADA ---
-    const saveYouTubeProgress = async () => {
-        const player = playerRef.current;
-        if (!player || typeof player.getCurrentTime !== 'function') return;
-
-        const currentTime = player.getCurrentTime();
-        const existingProgress = await findOrCreateProgress();
-
-        if (existingProgress) {
-            await updateData('historico', existingProgress.id, { tempoAssistido: currentTime });
-        } else {
-            const newProgress = {
-                usuarioId: user.id,
-                treinamentoId: training.id,
-                concluido: false,
-                dataConclusao: null,
-                notaQuestionario: null,
-                tempoAssistido: currentTime
-            };
-            await addData('historico', newProgress);
-        }
-    };
-
-    const onYouTubePlayerReady = (event) => {
-        playerRef.current = event.target;
-        if (initialProgress) {
-            playerRef.current.seekTo(initialProgress);
-        }
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = setInterval(saveYouTubeProgress, 5000);
+        return null;
     };
 
     const onYouTubePlayerStateChange = (event) => {
         if (event.data === 0) { // Vídeo terminou
             setVideoCompleted(true);
-            clearInterval(progressIntervalRef.current);
         }
     };
     
-    // --- FUNÇÃO REFATORADA ---
     const completeTraining = async (score) => {
-        let finalTime = 0;
-        if (playerRef.current && typeof playerRef.current.getDuration === 'function') {
-            finalTime = playerRef.current.getDuration();
-        }
-
         const existingProgress = await findOrCreateProgress();
         const completionData = {
-            concluido: true,
+            concluido: true, 
             dataConclusao: new Date().toISOString(),
-            notaQuestionario: score,
-            tempoAssistido: finalTime
+            notaQuestionario: score, // A nota já são os pontos
+            pontosGanhos: score // <-- NOVO: Campo unificado para pontos
         };
 
         if (existingProgress) {
             await updateData('historico', existingProgress.id, completionData);
         } else {
             const newProgress = {
-                usuarioId: user.id,
-                treinamentoId: training.id,
-                ...completionData
+                usuarioId: user.id, treinamentoId: training.id, ...completionData
             };
             await addData('historico', newProgress);
         }
         
-        toast({ title: "Treinamento concluído!", description: score ? `Parabéns! Você obteve nota ${score}/10.` : `Você concluiu o treinamento.` });
+        toast({ title: "Treinamento concluído!", description: score !== null ? `Parabéns! Você ganhou ${score} pontos.` : `Você concluiu o treinamento.` });
         setShowQuiz(false);
         onComplete();
     };
 
     const startQuiz = () => {
+        // Se não houver perguntas, conclui com uma pontuação padrão (ex: 5 pontos)
         if (!training?.perguntas || training.perguntas.length === 0) {
-            completeTraining(10);
+            completeTraining(5); 
             return;
         }
         setShowQuiz(true);
@@ -178,49 +142,22 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete, initialProgress
         if (file && file.url) {
             window.open(file.url, '_blank');
         } else {
-            toast({
-                title: "Erro",
-                description: "Não foi possível encontrar o URL do arquivo.",
-                variant: "destructive"
-            });
+            toast({ title: "Erro", description: "Não foi possível encontrar o URL do arquivo.", variant: "destructive" });
         }
     };
 
     const handleClose = () => {
         setShowQuiz(false);
-        clearInterval(progressIntervalRef.current);
         onClose();
     };
 
     const hasQuestions = training?.perguntas && training.perguntas.length > 0;
-
-    const getYouTubeVideoId = (url) => {
-        if (!url) return null;
-        try {
-            const urlObj = new URL(url);
-            if (urlObj.hostname === 'youtu.be') {
-                return urlObj.pathname.slice(1);
-            }
-            if (urlObj.hostname.includes('youtube.com')) {
-                return urlObj.searchParams.get('v');
-            }
-        } catch (error) {
-            return null;
-        }
-        return null;
-    };
-    
-    const videoId = getYouTubeVideoId(training?.video);
-    const isYouTube = !!videoId;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
             <DialogContent className="glass-effect border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-thin">
                 <DialogHeader>
                     <DialogTitle className="text-xl">{training?.titulo}</DialogTitle>
-                    <DialogDescription className="text-slate-400 sr-only">
-                        {training?.descricao}
-                    </DialogDescription>
                 </DialogHeader>
                 {!showQuiz ? (
                     <div className="space-y-6">
@@ -231,7 +168,6 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete, initialProgress
                                         videoId={videoId}
                                         className="absolute top-0 left-0 w-full h-full"
                                         opts={{ width: '100%', height: '100%' }}
-                                        onReady={onYouTubePlayerReady}
                                         onStateChange={onYouTubePlayerStateChange}
                                     />
                                 ) : (
@@ -245,9 +181,7 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete, initialProgress
                                     ></iframe>
                                 )
                             ) : (
-                                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
-                                    <p>URL de vídeo inválida.</p>
-                                </div>
+                                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center"><p>URL de vídeo inválida.</p></div>
                             )}
                         </div>
                         <div className="space-y-4">
@@ -269,15 +203,16 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete, initialProgress
                                     <Button 
                                         onClick={startQuiz} 
                                         disabled={isYouTube && !videoCompleted} 
-                                        className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 disabled:opacity-50"
+                                        className="bg-gradient-to-r from-green-500 to-blue-500 disabled:opacity-50"
                                     >
                                         <Award className="w-4 h-4 mr-2" /> Fazer Questionário
                                     </Button>
                                 ) : (
+                                    // Atribui 5 pontos pela conclusão de um treinamento sem questionário
                                     <Button 
-                                        onClick={() => completeTraining(null)} 
+                                        onClick={() => completeTraining(5)} 
                                         disabled={isYouTube && !videoCompleted} 
-                                        className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 disabled:opacity-50"
+                                        className="bg-gradient-to-r from-green-500 to-blue-500 disabled:opacity-50"
                                     >
                                         <CheckCircle className="w-4 h-4 mr-2" /> Concluir Treinamento
                                     </Button>
@@ -294,3 +229,4 @@ const TrainingDialog = ({ training, isOpen, onClose, onComplete, initialProgress
 };
 
 export default TrainingDialog;
+

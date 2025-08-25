@@ -21,8 +21,9 @@ const TrainingList = () => {
     const [selectedTraining, setSelectedTraining] = useState(null);
     const { user } = useAuth();
 
-    // --- ESTADOS DE PAGINAÇÃO SIMPLIFICADOS (PLANO B) ---
-    const [lastVisible, setLastVisible] = useState(null);
+    // Estados para a paginação dupla
+    const [lastVisibleDept, setLastVisibleDept] = useState(null);
+    const [lastVisibleTodos, setLastVisibleTodos] = useState(null);
     const [hasMore, setHasMore] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -31,19 +32,30 @@ const TrainingList = () => {
         if (isLoading || !user) return;
         setIsLoading(true);
 
-        const result = await getPaginatedTrainingsForUser(user.departamento, {
-            lastVisible: isLoadMore ? lastVisible : null
-        });
+        const result = await getPaginatedTrainingsForUser(
+            user.departamento,
+            {
+                lastVisibleDept: isLoadMore ? lastVisibleDept : null,
+                lastVisibleTodos: isLoadMore ? lastVisibleTodos : null,
+            }
+        );
 
         if (result.data.length > 0) {
-            // Garante que não haja duplicatas ao carregar mais
-            const existingIds = new Set(allTrainings.map(t => t.id));
-            const newTrainings = result.data.filter(t => !existingIds.has(t.id));
-            setAllTrainings(prev => isLoadMore ? [...prev, ...newTrainings] : result.data);
-            setLastVisible(result.lastVisible);
+            // Usa um Map para juntar os resultados e remover duplicados
+            const trainingsMap = new Map(isLoadMore ? allTrainings.map(t => [t.id, t]) : []);
+            result.data.forEach(t => trainingsMap.set(t.id, t));
+            
+            const updatedTrainings = Array.from(trainingsMap.values())
+              .sort((a, b) => new Date(b.dataPublicacao) - new Date(a.dataPublicacao));
+              
+            setAllTrainings(updatedTrainings);
+            
+            setLastVisibleDept(result.lastVisibleDept);
+            setLastVisibleTodos(result.lastVisibleTodos);
         }
 
-        if (!result.lastVisible || result.data.length < 15) { // PAGE_SIZE
+        // Se ambas as buscas não trouxerem mais nada, desativa o botão
+        if (!result.lastVisibleDept && !result.lastVisibleTodos) {
             setHasMore(false);
         }
         
@@ -60,11 +72,9 @@ const TrainingList = () => {
             ]);
 
             setCategories(categoriesData);
-
             const progress = {};
             historicoSnapshot.forEach(doc => {
-                const data = doc.data();
-                progress[data.treinamentoId.toString()] = { id: doc.id, ...data };
+                progress[doc.data().treinamentoId.toString()] = { id: doc.id, ...doc.data() };
             });
             setUserProgress(progress);
 
@@ -79,21 +89,16 @@ const TrainingList = () => {
 
     useEffect(() => {
         if (user) {
-            // Reseta o estado ao mudar de usuário para evitar dados misturados
-            setAllTrainings([]);
-            setLastVisible(null);
-            setHasMore(true);
             loadInitialData();
         }
     }, [user]);
 
     useEffect(() => {
-        let filtered = [...allTrainings];
+        let filtered = allTrainings;
         
         if (searchTerm) {
             filtered = filtered.filter(training =>
-                training.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (training.descricao && training.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
+                training.titulo.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
         
@@ -112,25 +117,20 @@ const TrainingList = () => {
         const historicoSnapshot = await getDocs(query(collection(db, 'historico'), where('usuarioId', '==', user.id)));
         const progress = {};
         historicoSnapshot.forEach(doc => {
-            const data = doc.data();
-            progress[data.treinamentoId.toString()] = { id: doc.id, ...data };
+            progress[doc.data().treinamentoId.toString()] = { id: doc.id, ...doc.data() };
         });
         setUserProgress(prev => ({ ...prev, ...progress }));
     };
 
     if (isInitialLoad) {
-        return (
-            <div className="flex justify-center items-center h-full">
-                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-            </div>
-        );
+        return <div className="flex justify-center items-center h-full"><Loader2 className="h-10 w-10 animate-spin text-blue-500" /></div>;
     }
 
     return (
         <div className="space-y-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                 <h1 className="text-3xl font-bold text-white">Meus Treinamentos</h1>
-                <p className="text-slate-400">Acesse seus treinamentos disponíveis</p>
+                <p className="text-slate-400">Acesse os seus treinamentos disponíveis.</p>
             </motion.div>
 
             <motion.div
@@ -179,13 +179,9 @@ const TrainingList = () => {
             </div>
 
             {filteredTrainings.length === 0 && !isLoading && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-center py-12"
-                >
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
                     <BookOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400 text-lg">Nenhum treinamento encontrado</p>
+                    <p className="text-slate-400 text-lg">Nenhum treinamento encontrado.</p>
                 </motion.div>
             )}
 

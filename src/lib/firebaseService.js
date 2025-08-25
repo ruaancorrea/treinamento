@@ -10,12 +10,12 @@ import {
     orderBy, 
     limit, 
     startAfter,
-    where
+    where,
+    updateDoc
 } from "firebase/firestore";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10; // Reduzimos um pouco para equilibrar as duas buscas
 
-// --- As funções getAllData e getPaginatedData não mudam ---
 export const getAllData = async (collectionName) => {
     try {
         const querySnapshot = await getDocs(collection(db, collectionName));
@@ -59,52 +59,64 @@ export const getPaginatedData = async (collectionName, options) => {
     }
 };
 
-
 /**
- * (VERSÃO PLANO C - SEM ÍNDICES)
- * Esta função lê todos os treinamentos ativos e filtra no código.
- * É menos eficiente e mais custosa, mas não requer índices.
- * A paginação é simulada no lado do cliente.
+ * (VERSÃO FINAL E OTIMIZADA COM PAGINAÇÃO REAL)
+ * Busca treinamentos para o usuário com paginação, usando duas queries separadas.
  */
 export const getPaginatedTrainingsForUser = async (userDepartment, options = {}) => {
-    console.warn("Atenção: Usando modo de busca de treinamentos não otimizado (Plano C).");
-    const { page = 1 } = options; 
+    const { lastVisibleDept = null, lastVisibleTodos = null } = options;
     
     try {
         const trainingsRef = collection(db, 'treinamentos');
         
-        // 1. Busca TODOS os treinamentos que estão ativos.
-        const q = query(trainingsRef, where('ativo', '==', true));
-        const querySnapshot = await getDocs(q);
-
-        const allActiveTrainings = [];
-        querySnapshot.forEach(doc => {
-            allActiveTrainings.push({ id: doc.id, ...doc.data() });
-        });
-
-        // 2. Filtra no código para o departamento do usuário + "Todos".
-        const userVisibleTrainings = allActiveTrainings.filter(
-            training => training.departamento === userDepartment || training.departamento === 'Todos'
+        // Query 1: Para o departamento específico do usuário
+        const deptBaseQuery = query(
+            trainingsRef,
+            where('ativo', '==', true),
+            where('departamento', '==', userDepartment),
+            orderBy('dataPublicacao', 'desc'),
+            limit(PAGE_SIZE)
         );
+        const deptQuery = lastVisibleDept ? query(deptBaseQuery, startAfter(lastVisibleDept)) : deptBaseQuery;
 
-        // 3. Ordena por data no código.
-        userVisibleTrainings.sort((a, b) => new Date(b.dataPublicacao) - new Date(a.dataPublicacao));
+        // Query 2: Para o departamento "Todos"
+        const todosBaseQuery = query(
+            trainingsRef,
+            where('ativo', '==', true),
+            where('departamento', '==', 'Todos'),
+            orderBy('dataPublicacao', 'desc'),
+            limit(PAGE_SIZE)
+        );
+        const todosQuery = lastVisibleTodos ? query(todosBaseQuery, startAfter(lastVisibleTodos)) : todosBaseQuery;
+
+        // Executa as duas buscas em paralelo
+        const [deptSnapshot, todosSnapshot] = await Promise.all([
+            getDocs(deptQuery),
+            getDocs(todosQuery)
+        ]);
+
+        // Junta os resultados
+        const trainingsData = [];
+        deptSnapshot.forEach(doc => trainingsData.push({ id: doc.id, ...doc.data() }));
+        todosSnapshot.forEach(doc => trainingsData.push({ id: doc.id, ...doc.data() }));
         
-        // 4. Simula a paginação. Esta lógica foi removida para simplificar,
-        //    pois carregar tudo de uma vez é a premissa deste plano.
-        //    Vamos retornar tudo e a lógica de "Carregar Mais" será desativada.
-        
-        return { data: userVisibleTrainings, lastVisible: null }; // Retorna null para desativar o "Carregar mais".
+        // Pega os últimos documentos de cada busca para a próxima página
+        const newLastVisibleDept = deptSnapshot.docs.length > 0 ? deptSnapshot.docs[deptSnapshot.docs.length - 1] : null;
+        const newLastVisibleTodos = todosSnapshot.docs.length > 0 ? todosSnapshot.docs[todosSnapshot.docs.length - 1] : null;
+
+        return {
+            data: trainingsData,
+            lastVisibleDept: newLastVisibleDept,
+            lastVisibleTodos: newLastVisibleTodos
+        };
 
     } catch (error) {
-        // Este erro não deverá ser de índice.
-        console.error(`Erro ao buscar treinamentos (Plano C):`, error);
-        return { data: [], lastVisible: null };
+        console.error(`Erro ao buscar treinamentos paginados:`, error);
+        return { data: [], lastVisibleDept: null, lastVisibleTodos: null };
     }
 };
 
 
-// --- Funções de Escrita (ADD, UPDATE, DELETE) - Sem alterações ---
 export const addData = async (collectionName, data) => {
     try {
         const docRef = await addDoc(collection(db, collectionName), data);
@@ -117,16 +129,44 @@ export const addData = async (collectionName, data) => {
 
 export const updateData = async (collectionName, docId, data) => {
     try {
-        const docRef = doc(db, collectionName, docId);
+        const docRef = doc(db, collectionName, String(docId));
         await setDoc(docRef, data, { merge: true });
     } catch (error) {
         console.error(`Erro ao atualizar documento em ${collectionName}:`, error);
     }
 };
 
+export const resetUserData = async (userId) => {
+    try {
+        const stringUserId = String(userId);
+
+        const resultadosQuery = query(collection(db, 'resultadosSimulados'), where('usuarioId', '==', userId));
+        const resultadosSnapshot = await getDocs(resultadosQuery);
+        for (const doc of resultadosSnapshot.docs) {
+            await deleteDoc(doc.ref);
+        }
+
+        const historicoQuery = query(collection(db, 'historico'), where('usuarioId', '==', userId));
+        const historicoSnapshot = await getDocs(historicoQuery);
+        for (const doc of historicoSnapshot.docs) {
+            await deleteDoc(doc.ref);
+        }
+
+        const userRef = doc(db, 'usuarios', stringUserId);
+        await updateDoc(userRef, {
+            titulo: 'Iniciante',
+            medalhas: []
+        });
+
+    } catch (error) {
+        console.error(`Erro ao zerar dados do usuário ${userId}:`, error);
+        throw new Error("Não foi possível zerar o desempenho do usuário.");
+    }
+};
+
 export const deleteData = async (collectionName, docId) => {
     try {
-        await deleteDoc(doc(db, collectionName, docId));
+        await deleteDoc(doc(db, collectionName, String(docId)));
     } catch (error) {
         console.error(`Erro ao deletar documento em ${collectionName}:`, error);
     }

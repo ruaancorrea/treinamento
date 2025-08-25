@@ -18,10 +18,12 @@ import Progress from '@/components/Employee/Progress';
 import Ranking from '@/components/Employee/Ranking';
 import KnowledgeBase from '@/components/Shared/KnowledgeBase';
 import KnowledgeBaseManagement from '@/components/Admin/KnowledgeBaseManagement';
+import SimuladoManagement from './components/Admin/SimuladoManagement';
+import SimuladoList from './components/Employee/SimuladoList';
+import SimuladoPlayer from './components/Employee/SimuladoPlayer'; // <-- Importa a tela de jogo
 
 // --- LÓGICA DE MIGRAÇÃO ---
-import { initializeDatabase, getDatabase } from '@/data/mockData'; // Usado APENAS para a migração
-import { addData } from '@/lib/firebaseService';
+import { initializeDatabase, getDatabase } from '@/data/mockData';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/firebaseConfig';
 
@@ -29,6 +31,7 @@ import { db } from '@/firebaseConfig';
 const MainApp = () => {
     const { user, logout, isAdmin, loading } = useAuth();
     const [activeTab, setActiveTab] = useState('');
+    const [selectedSimulado, setSelectedSimulado] = useState(null); // <-- Guarda o simulado a ser jogado
 
     useEffect(() => {
         if (user) {
@@ -41,7 +44,25 @@ const MainApp = () => {
         setActiveTab('');
     };
 
+    // Função para iniciar o simulado, chamada pela SimuladoList
+    const handleStartSimulado = (simulado) => {
+        setSelectedSimulado(simulado);
+        setActiveTab('fazendo-simulado'); // Muda para a "aba" especial de jogo
+    };
+
+    // Função para finalizar o simulado, chamada pelo SimuladoPlayer
+    const handleFinishSimulado = () => {
+        setSelectedSimulado(null);
+        setActiveTab('meus-simulados'); // Volta para a lista de simulados
+    };
+
     const renderContent = () => {
+        // Lógica principal: se um simulado está selecionado, mostra a tela de jogo
+        if (activeTab === 'fazendo-simulado' && selectedSimulado) {
+            return <SimuladoPlayer simulado={selectedSimulado} onFinish={handleFinishSimulado} />;
+        }
+
+        // Caso contrário, mostra a aba normal
         switch (activeTab) {
             // Admin
             case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
@@ -53,10 +74,12 @@ const MainApp = () => {
             case 'relatorios': return <Reports />;
             case 'gerenciar-conhecimento': return <KnowledgeBaseManagement />;
             case 'configuracoes': return <Settings />;
+            case 'simulados': return <SimuladoManagement />;
             
             // Employee
             case 'meus-treinamentos': return <TrainingList />;
             case 'minhas-trilhas': return <LearningPathList />;
+            case 'meus-simulados': return <SimuladoList onStartSimulado={handleStartSimulado} />;
             case 'progresso': return <Progress />;
             case 'ranking': return <Ranking />;
 
@@ -93,80 +116,46 @@ const MainApp = () => {
     );
 };
 
-// --- FUNÇÃO DE MIGRAÇÃO ---
+// --- FUNÇÃO DE MIGRAÇÃO E APP PRINCIPAL (sem alterações) ---
 const runMigration = async () => {
-    // Usamos um documento de controle para garantir que a migração rode só uma vez.
     const migrationControlRef = doc(db, "internal", "migrationStatus");
     const migrationControlSnap = await getDoc(migrationControlRef);
-
-    if (migrationControlSnap.exists() && migrationControlSnap.data().migrated) {
-        console.log("Migração de dados já foi executada. Pulando.");
-        return;
-    }
-
+    if (migrationControlSnap.exists() && migrationControlSnap.data().migrated) { return; }
     console.log("--- INICIANDO MIGRAÇÃO DE DADOS ---");
-    // Pega os dados do seu arquivo antigo, que foram carregados em memória
     const oldDb = getDatabase(); 
-
-    // Lista de todas as coleções a serem migradas
-    const collectionsToMigrate = [
-        'usuarios', 'categorias', 'departamentos', 'treinamentos', 
-        'historico', 'trilhas', 'knowledgeBase'
-    ];
-
+    const collectionsToMigrate = ['usuarios', 'categorias', 'departamentos', 'treinamentos', 'historico', 'trilhas', 'knowledgeBase'];
     for (const collectionName of collectionsToMigrate) {
         if (oldDb[collectionName] && Array.isArray(oldDb[collectionName])) {
             for (const item of oldDb[collectionName]) {
-                // --- CORREÇÃO AQUI ---
-                // Adicionamos uma verificação para garantir que o item e o item.id existem
-                // antes de tentar usá-los. Isso evita o erro.
-                if (item && item.id) {
-                    // Usamos o ID numérico antigo como ID do documento para manter as relações
-                    const docRef = doc(db, collectionName, item.id.toString());
-                    await setDoc(docRef, item);
-                } else {
-                    console.warn(`Item inválido encontrado na coleção "${collectionName}" e foi ignorado:`, item);
-                }
+                if (item && item.id) { await setDoc(doc(db, collectionName, item.id.toString()), item); }
             }
-            console.log(`${oldDb[collectionName].length} documentos migrados para a coleção "${collectionName}".`);
         }
     }
-
-    // Marca a migração como concluída para não rodar novamente
     await setDoc(migrationControlRef, { migrated: true, date: new Date().toISOString() });
     console.log("--- MIGRAÇÃO CONCLUÍDA COM SUCESSO ---");
 };
 
-
 function App() {
     const [dbLoaded, setDbLoaded] = useState(false);
-
     useEffect(() => {
         const loadAndMigrate = async () => {
-            // 1. Carrega os dados do documento antigo em memória
             await initializeDatabase(); 
-            // 2. Executa a migração para a nova estrutura de coleções (só roda na primeira vez)
-            await runMigration();       
-            // 3. Libera a aplicação para ser renderizada
+            await runMigration();      
             setDbLoaded(true);
         };
         loadAndMigrate();
     }, []);
-
     if (!dbLoaded) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-900">
                 <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-                <p className="text-white ml-4">Inicializando e verificando banco de dados...</p>
+                <p className="text-white ml-4">Inicializando...</p>
             </div>
         );
     }
-
     return (
         <AuthProvider>
-            <Helmet>
-                <title>Central de Treinamento NTW</title>
-            </Helmet>
+            <Helmet><title>Central de Treinamento</title></Helmet>
             <MainApp />
             <Toaster />
         </AuthProvider>
