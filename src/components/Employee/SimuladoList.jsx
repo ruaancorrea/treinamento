@@ -1,56 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Loader2, CheckSquare } from 'lucide-react';
+import { Search, Loader2, CheckSquare, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { getPaginatedData } from '@/lib/firebaseService';
+import { getPaginatedData, getAllData } from '@/lib/firebaseService';
+import { useAuth } from '@/contexts/AuthContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// A prop agora é 'onStartSimulado' para comunicar com o App.jsx
 const SimuladoList = ({ onStartSimulado }) => {
     const [allSimulados, setAllSimulados] = useState([]);
-    const [filteredSimulados, setFilteredSimulados] = useState([]);
+    const [userResults, setUserResults] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [lastVisible, setLastVisible] = useState(null);
     const [hasMore, setHasMore] = useState(true);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-    const fetchSimulados = async (isLoadMore = false) => {
-        if (isLoading) return;
-        setIsLoading(true);
-
-        const result = await getPaginatedData('simulados', { 
-            lastVisible: isLoadMore ? lastVisible : null,
-            orderByField: "dataCriacao",
-            orderDirection: "desc",
-        });
-        
-        const activeSimulados = result.data.filter(s => s.ativo);
-
-        if (activeSimulados.length > 0) {
-            setAllSimulados(prev => isLoadMore ? [...prev, ...activeSimulados] : activeSimulados);
-            setLastVisible(result.lastVisible);
-        }
-
-        if (result.data.length < 15) { // PAGE_SIZE
-            setHasMore(false);
-        }
-        setIsLoading(false);
-    };
+    const [isLoading, setIsLoading] = useState(true);
+    const { user } = useAuth();
 
     useEffect(() => {
-        setIsInitialLoad(true);
-        fetchSimulados().then(() => setIsInitialLoad(false));
-    }, []);
+        const loadData = async () => {
+            if (!user) return;
+            setIsLoading(true);
+            const [simuladosData, resultadosData] = await Promise.all([
+                getAllData('simulados'), // Carregamos todos para facilitar a lógica de filtro
+                getAllData('resultadosSimulados')
+            ]);
+            
+            setAllSimulados(simuladosData.filter(s => s.ativo));
+            setUserResults(resultadosData.filter(r => r.usuarioId === user.id));
+            setIsLoading(false);
+        };
+        loadData();
+    }, [user]);
 
-    useEffect(() => {
-        setFilteredSimulados(
-            allSimulados.filter(s => s.titulo.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-    }, [allSimulados, searchTerm]);
+    const simuladosComStatus = useMemo(() => {
+        return allSimulados
+            .filter(s => s.titulo.toLowerCase().includes(searchTerm.toLowerCase()))
+            .map(simulado => {
+                const userAttempts = userResults.filter(r => r.simuladoId === simulado.id);
+                const { regraTentativa, limiteTentativas } = simulado;
+                
+                let canAttempt = true;
+                let reason = "";
 
-    if (isInitialLoad) {
+                if (regraTentativa === 'once' && userAttempts.length >= 1) {
+                    canAttempt = false;
+                    reason = "Você já completou este simulado.";
+                } else if (regraTentativa === 'monthly') {
+                    const now = new Date();
+                    const lastAttempt = userAttempts.sort((a, b) => new Date(b.dataConclusao) - new Date(a.dataConclusao))[0];
+                    if (lastAttempt) {
+                        const lastAttemptDate = new Date(lastAttempt.dataConclusao);
+                        if (lastAttemptDate.getMonth() === now.getMonth() && lastAttemptDate.getFullYear() === now.getFullYear()) {
+                            canAttempt = false;
+                            reason = "Disponível novamente no próximo mês.";
+                        }
+                    }
+                } else if (regraTentativa === 'specific_amount' && userAttempts.length >= limiteTentativas) {
+                    canAttempt = false;
+                    reason = `Limite de ${limiteTentativas} tentativas atingido.`;
+                }
+
+                return { ...simulado, canAttempt, reason, attemptCount: userAttempts.length };
+            });
+    }, [allSimulados, userResults, searchTerm]);
+
+    if (isLoading) {
         return <div className="flex justify-center items-center h-full"><Loader2 className="h-10 w-10 animate-spin text-blue-500" /></div>;
     }
 
@@ -73,14 +88,9 @@ const SimuladoList = ({ onStartSimulado }) => {
                 </div>
             </motion.div>
 
-            {filteredSimulados.length === 0 && !isLoading ? (
-                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-                    <CheckSquare className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400 text-lg">Nenhum simulado encontrado no momento.</p>
-                </motion.div>
-            ) : (
+            <TooltipProvider>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredSimulados.map((simulado) => (
+                    {simuladosComStatus.map((simulado) => (
                         <motion.div key={simulado.id}>
                             <Card className="glass-effect border-slate-700 card-hover h-full flex flex-col">
                                 <CardHeader>
@@ -90,25 +100,29 @@ const SimuladoList = ({ onStartSimulado }) => {
                                 <CardContent className="flex-grow">
                                     <p className="text-sm text-slate-300 line-clamp-3">{simulado.descricao}</p>
                                 </CardContent>
-                                <CardFooter className="flex justify-end">
-                                    {/* A função onStartSimulado é chamada aqui para iniciar o jogo */}
-                                    <Button onClick={() => onStartSimulado(simulado)} className="bg-gradient-to-r from-blue-500 to-purple-600">
-                                        Iniciar Simulado
-                                    </Button>
+                                <CardFooter className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-500">Tentativas: {simulado.attemptCount}</span>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            {/* O div é necessário para o tooltip funcionar em botões desativados */}
+                                            <div> 
+                                                <Button 
+                                                    onClick={() => onStartSimulado(simulado)} 
+                                                    disabled={!simulado.canAttempt}
+                                                    className="bg-gradient-to-r from-blue-500 to-purple-600 disabled:opacity-50"
+                                                >
+                                                    {simulado.canAttempt ? 'Iniciar Simulado' : <Lock className="w-4 h-4" />}
+                                                </Button>
+                                            </div>
+                                        </TooltipTrigger>
+                                        {!simulado.canAttempt && <TooltipContent><p>{simulado.reason}</p></TooltipContent>}
+                                    </Tooltip>
                                 </CardFooter>
                             </Card>
                         </motion.div>
                     ))}
                 </div>
-            )}
-
-            {hasMore && (
-                <div className="text-center mt-8">
-                    <Button onClick={() => fetchSimulados(true)} disabled={isLoading}>
-                        {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando...</> : 'Carregar Mais'}
-                    </Button>
-                </div>
-            )}
+            </TooltipProvider>
         </div>
     );
 };

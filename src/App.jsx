@@ -20,7 +20,10 @@ import KnowledgeBase from '@/components/Shared/KnowledgeBase';
 import KnowledgeBaseManagement from '@/components/Admin/KnowledgeBaseManagement';
 import SimuladoManagement from './components/Admin/SimuladoManagement';
 import SimuladoList from './components/Employee/SimuladoList';
-import SimuladoPlayer from './components/Employee/SimuladoPlayer'; // <-- Importa a tela de jogo
+import SimuladoPlayer from './components/Employee/SimuladoPlayer';
+import CertificateView from './components/Shared/CertificateView';
+import PdiManagement from './components/Admin/PdiManagement';
+import PdiView from './components/Employee/PdiView'; // <-- Importado aqui
 
 // --- LÓGICA DE MIGRAÇÃO ---
 import { initializeDatabase, getDatabase } from '@/data/mockData';
@@ -31,42 +34,61 @@ import { db } from '@/firebaseConfig';
 const MainApp = () => {
     const { user, logout, isAdmin, loading } = useAuth();
     const [activeTab, setActiveTab] = useState('');
-    const [selectedSimulado, setSelectedSimulado] = useState(null); // <-- Guarda o simulado a ser jogado
+    const [selectedSimulado, setSelectedSimulado] = useState(null);
+    const [certificateData, setCertificateData] = useState(null);
 
     useEffect(() => {
         if (user) {
-            setActiveTab(isAdmin() ? 'dashboard' : 'meus-treinamentos');
+            // Define a página inicial do funcionário como "Meu PDI"
+            setActiveTab(isAdmin() ? 'dashboard' : 'meu-pdi');
         }
     }, [user, isAdmin]);
+
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('customTheme');
+        if (savedTheme) {
+            // ... (código do tema que já tem)
+        }
+    }, []);
 
     const handleLogout = () => {
         logout();
         setActiveTab('');
     };
 
-    // Função para iniciar o simulado, chamada pela SimuladoList
     const handleStartSimulado = (simulado) => {
         setSelectedSimulado(simulado);
-        setActiveTab('fazendo-simulado'); // Muda para a "aba" especial de jogo
+        setActiveTab('fazendo-simulado');
     };
 
-    // Função para finalizar o simulado, chamada pelo SimuladoPlayer
     const handleFinishSimulado = () => {
         setSelectedSimulado(null);
-        setActiveTab('meus-simulados'); // Volta para a lista de simulados
+        setActiveTab('meus-simulados');
+    };
+
+    const handleViewCertificate = (learningPath) => {
+        setCertificateData({ user, learningPath, completionDate: new Date() });
+        setActiveTab('ver-certificado');
+    };
+
+    const handleBackFromCertificate = () => {
+        setCertificateData(null);
+        setActiveTab('minhas-trilhas');
     };
 
     const renderContent = () => {
-        // Lógica principal: se um simulado está selecionado, mostra a tela de jogo
+        if (activeTab === 'ver-certificado' && certificateData) {
+            return <CertificateView certificateData={certificateData} onBack={handleBackFromCertificate} />;
+        }
         if (activeTab === 'fazendo-simulado' && selectedSimulado) {
             return <SimuladoPlayer simulado={selectedSimulado} onFinish={handleFinishSimulado} />;
         }
 
-        // Caso contrário, mostra a aba normal
         switch (activeTab) {
             // Admin
             case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
             case 'usuarios': return <UserManagement />;
+            case 'pdi': return <PdiManagement />;
             case 'treinamentos': return <TrainingManagement />;
             case 'trilhas': return <LearningPathManagement />;
             case 'categorias': return <CategoryManagement />;
@@ -77,8 +99,11 @@ const MainApp = () => {
             case 'simulados': return <SimuladoManagement />;
             
             // Employee
+            // V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V
+            case 'meu-pdi': return <PdiView />; // <-- MUDANÇA IMPORTANTE AQUI
+            // ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ 
             case 'meus-treinamentos': return <TrainingList />;
-            case 'minhas-trilhas': return <LearningPathList />;
+            case 'minhas-trilhas': return <LearningPathList onViewCertificate={handleViewCertificate} />;
             case 'meus-simulados': return <SimuladoList onStartSimulado={handleStartSimulado} />;
             case 'progresso': return <Progress />;
             case 'ranking': return <Ranking />;
@@ -86,7 +111,7 @@ const MainApp = () => {
             // Shared
             case 'base-de-conhecimento': return <KnowledgeBase />;
             
-            default: return isAdmin() ? <Dashboard setActiveTab={setActiveTab} /> : <TrainingList />;
+            default: return isAdmin() ? <Dashboard setActiveTab={setActiveTab} /> : <PdiView />;
         }
     };
 

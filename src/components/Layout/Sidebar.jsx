@@ -13,7 +13,8 @@ import {
     Building,
     GitMerge,
     FileCog,
-    CheckSquare 
+    CheckSquare,
+    ClipboardCheck 
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -24,22 +25,23 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     const adminMenuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: Home },
         { id: 'usuarios', label: 'Usuários', icon: Users },
+        { id: 'pdi', label: 'Planos (PDI)', icon: ClipboardCheck },
         { id: 'treinamentos', label: 'Treinamentos', icon: GraduationCap },
         { id: 'trilhas', label: 'Trilhas', icon: GitMerge }, 
         { id: 'simulados', label: 'Simulados (Admin)', icon: CheckSquare }, 
         { id: 'categorias', label: 'Categorias', icon: FolderOpen },
         { id: 'departamentos', label: 'Departamentos', icon: Building },
         { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
-        { id: 'base-de-conhecimento', label: 'Conhecimento', icon: BookOpen },
         { id: 'gerenciar-conhecimento', label: 'Gerenciar Conhecimento', icon: FileCog },
         { id: 'configuracoes', label: 'Configurações', icon: Settings }
     ];
 
     const funcionarioMenuItems = [
-        { id: 'meus-treinamentos', label: 'Meus Treinamentos', icon: GraduationCap },
         // V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V V
-        { id: 'meus-simulados', label: 'Meus Simulados', icon: CheckSquare }, // <-- MUDANÇA IMPORTANTE AQUI: ESTA LINHA FAZ O BOTÃO APARECER
+        { id: 'meu-pdi', label: 'Meu PDI', icon: ClipboardCheck }, // <-- MUDANÇA IMPORTANTE AQUI
         // ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ 
+        { id: 'meus-treinamentos', label: 'Meus Treinamentos', icon: GraduationCap },
+        { id: 'meus-simulados', label: 'Meus Simulados', icon: CheckSquare },
         { id: 'minhas-trilhas', label: 'Minhas Trilhas', icon: GitMerge },
         { id: 'progresso', label: 'Meu Progresso', icon: BarChart3 },
         { id: 'ranking', label: 'Ranking', icon: Trophy },
@@ -61,7 +63,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
                     </div>
                     <div>
                         <span className="text-lg font-bold text-white">Central de</span>
-                        <p className="text-sm text-slate-300">Treinamento</p>
+                        <p className="text-sm text-slate-300">Treinamento NTW</p>
                     </div>
                 </div>
             </div>
